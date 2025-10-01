@@ -1,0 +1,43 @@
+# =============== #
+# Unity generated #
+# =============== # 
+Framework/[Ll]ibrary/
+Framework/[Tt]emp/
+Framework/[Oo]bj/
+Framework/Assets/GIT_IGNORE/
+/build.windows/
+/build.android/
+
+# ===================================== #
+# Visual Studio / MonoDevelop generated #
+# ===================================== #
+*.svd
+*.userprefs
+*.csproj
+*.pidb
+*.suo
+*.sln
+*.user
+*.unityproj
+*.booproj
+UnityProject/.vs/
+Assembly-CSharp-Editor-firstpass-vs.csproj
+UnityVS.VersionSpecific.dll
+
+# ============ #
+# OS generated #
+# ============ #
+src/.DS_Store
+src/.DS_Store?
+._*
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ============ #
+# Razvan       #
+# ============ #
+[bB]uilds/
+PersonalResources/
+/build.windows/
+Framework/.vs/
