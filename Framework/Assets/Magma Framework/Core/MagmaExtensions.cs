@@ -58,5 +58,15 @@ namespace MagmaFlow.Framework.Utils
 		{
 			return (layerMask.value & (1 << gameObject.layer)) != 0;
 		}
+
+		/// <summary>
+		/// Retrieves the layer of this object as a layer mask that only includes the object's layer
+		/// </summary>
+		/// <param name="gameObject"></param>
+		/// <returns></returns>
+		public static LayerMask LayerToLayerMask(this GameObject gameObject)
+		{
+			return 1 << gameObject.layer;
+		}
 	}
 }

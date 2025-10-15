@@ -1,85 +1,77 @@
-﻿using System;
+﻿using MagmaFlow.Framework.Core;
+using MagmaFlow.Framework.Events;
+using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 
 namespace MagmaFlow.Framework
-{
+{	
+	/// <summary>
+	/// This should replace Unity's MonoBehaviour for an array of extended functionality provided by the MagmaFlow Framework
+	/// </summary>
 	public class BaseBehaviour : MonoBehaviour
 	{	
-		protected ApplicationCore ApplicationCore => ApplicationCore.Instance;
-
-		private Transform subComponent;
+		protected MagmaFramework MagmaFramework => MagmaFramework.Instance;
 
 		/// <summary>
-		/// Using ComputePenetration(), returns a list of all the contact points around a sphere collider of radius 'radius'
+		/// Using ComputePenetration(), returns a list of all the contact points around a sphere collider of radius 'radius' for this object's collider
 		/// </summary>
-		/// <param name="spherePosition"></param>
+		/// <param name="sourcePoint"></param>
 		/// <param name="radius"></param>
-		/// <param name="wallLayer"></param>
+		/// <param name="collisionLayerMask"></param>
 		/// <returns></returns>
-		protected List<Vector3> GetWallOverlapContactPoints(Vector3 spherePosition, float radius, LayerMask wallLayer)
-		{
+		protected List<Vector3> GetOverlapContactPoints(Vector3 sourcePoint, float radius, LayerMask collisionLayerMask)
+		{	
+			if(!TryGetComponent<Collider>(out var thisCollider))
+			{
+				Debug.LogError("Cannot get overlap points because this object does not have a collider");
+				return null;
+			}
+
 			var contactPoints = new List<Vector3>();
-
 			// Get all colliders overlapping the sphere
-			Collider[] colliders = Physics.OverlapSphere(spherePosition, radius, wallLayer, QueryTriggerInteraction.Ignore);
-
-			// Create a temporary sphere collider (used for penetration testing)
-			GameObject tempGO = new GameObject("TempSphere");
-			SphereCollider tempCollider = tempGO.AddComponent<SphereCollider>();
-			tempCollider.radius = radius;
-			tempGO.transform.position = spherePosition;
+			Collider[] colliders = Physics.OverlapSphere(sourcePoint, radius, collisionLayerMask, QueryTriggerInteraction.Ignore);
 
 			foreach (var hitCollider in colliders)
 			{
 				if (Physics.ComputePenetration(
-					tempCollider, spherePosition, Quaternion.identity,
+					thisCollider, transform.position, Quaternion.identity,
 					hitCollider, hitCollider.transform.position, hitCollider.transform.rotation,
 					out Vector3 direction, out float distance))
 				{
 					// Approximate contact point
-					Vector3 contactPoint = hitCollider.ClosestPoint(spherePosition) - direction * distance;
+					Vector3 contactPoint = hitCollider.ClosestPoint(sourcePoint) - direction * distance;
 					contactPoints.Add(contactPoint);
 				}
 			}
 
-			// Cleanup
-			Destroy(tempGO);
-
 			return contactPoints;
 		}
 
-		/// <summary>
-		/// This only works for a layer mask that contains a single layer
-		/// </summary>
-		/// <param name="mask"></param>
-		/// <returns></returns>
-		protected int LayerMaskToLayer(LayerMask mask)
+		#region Events
+		protected virtual void OnGamePaused(GamePausedEvent eventData) { }
+		protected virtual void OnSceneLoaded(SceneLoadedEvent eventData) { }
+		protected virtual void OnSceneUnloaded(SceneUnloadedEvent eventData) { }
+		protected virtual void OnDestroy()
 		{
-			int bitmask = mask.value;
-
-			if (bitmask == 0 || (bitmask & (bitmask - 1)) != 0)
-			{
-				Debug.LogError("LayerMask must have exactly one bit set.");
-				return -1; // or throw an exception
-			}
-
-			return (int)Mathf.Log(bitmask, 2);
+			OnDisable();
 		}
-
-		/// <summary>
-		/// Converts a 'int' layer to a layer mask
-		/// </summary>
-		/// <param name="gameObjectLayer"></param>
-		/// <returns></returns>
-		protected LayerMask LayerToLayerMask(GameObject gameObjectLayer)
+		protected virtual void OnEnable()
 		{
-			return 1 << gameObjectLayer.layer;
+			EventBus.Subscribe<GamePausedEvent>(OnGamePaused);
+			EventBus.Subscribe<SceneLoadedEvent>(OnSceneLoaded);
+			EventBus.Subscribe<SceneUnloadedEvent>(OnSceneUnloaded);
 		}
+		protected virtual void OnDisable()
+		{
+			EventBus.Unsubscribe<GamePausedEvent>(OnGamePaused);
+			EventBus.Unsubscribe<SceneLoadedEvent>(OnSceneLoaded);
+			EventBus.Unsubscribe<SceneUnloadedEvent>(OnSceneUnloaded);
+		}
+		#endregion Events
 
-		#region Get Children
+		#region Get subcomponents
 		/// <summary>
 		/// Returns a list of all instances of a type in all the children including grandchildren.
 		/// </summary>
@@ -96,31 +88,20 @@ namespace MagmaFlow.Framework
 		/// <para>The search excludes the parent!</para>
 		/// </summary>
 		/// <typeparam name="T"></typeparam>
-		/// <param name="searchOrigin"></param>
+		/// <param name="origin"></param>
 		/// <param name="childName"></param>
 		/// <returns></returns>
-		protected T GetSubcomponent<T>(Transform searchOrigin, string childName)
+		protected T GetSubcomponent<T>(Transform origin, string childName)
 		{
+			foreach (Transform child in origin)
+			{
+				if (child.name == childName && child.TryGetComponent(out T comp))
+					return comp;
 
-			if (searchOrigin.GetComponent<T>() != null && searchOrigin.gameObject.name == childName)
-			{
-				subComponent = searchOrigin;
+				var found = GetSubcomponent<T>(child, childName);
+				if (found != null) return found;
 			}
-			
-			foreach (Transform child in searchOrigin)
-			{
-				GetSubcomponent<T>(child, childName);
-			}
-
-			if (subComponent != null)
-			{
-				return subComponent.GetComponent<T>();
-			}
-			else
-			{
-				return default;
-			}
-
+			return default;
 		}
 
 		private void GetChildrenInternal<T>(Transform parent, List<T> result) where T : Component
@@ -140,7 +121,7 @@ namespace MagmaFlow.Framework
 			}
 		}
 
-		#endregion Get Children
+		#endregion Get subcomponents
 
 		#region Invoke
 		/// <summary>

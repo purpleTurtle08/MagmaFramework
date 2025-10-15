@@ -15,7 +15,7 @@ GameObject:
   - component: {fileID: 4924283241013481332}
   - component: {fileID: 4924283241013481328}
   m_Layer: 5
-  m_Name: UTILS_CANVAS
+  m_Name: MagmaUtilsCanvas
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

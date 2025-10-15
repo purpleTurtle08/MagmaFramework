@@ -1,4 +1,4 @@
-using MagmaFlow.Framework.Publishing;
+using MagmaFlow.Framework.Events;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -22,24 +22,41 @@ namespace MagmaFlow.Framework.Utils
 		Height = 1
 	}
 
+	/// <summary>
+	/// This tool ensures correct and consistent canvas scaling for your canvases
+	/// </summary>
 	[RequireComponent(typeof(Canvas))]
 	public class CanvasScaleTool : BaseBehaviour
 	{
 		[SerializeField] private CanvasDrawOrder canvasDrawOrder;
 		[SerializeField] private MatchResolutionProperty matchResolutionProperty;
 
-		private Publisher publisher;
-
 		private void Awake()
-		{	
-			publisher = ApplicationCore.Publisher;
-
-			publisher.Unsubscribe(PublisherTopics.SYSTEM_RESERVED_SCREEN_RESOLUTION_SET, ScaleCanvas);
-			ScaleCanvas();
-			publisher.Subscribe(PublisherTopics.SYSTEM_RESERVED_SCREEN_RESOLUTION_SET, ScaleCanvas);
+		{
+			float ratio = Screen.width < Screen.height ? (float)Screen.width / (float)Screen.height : (float)Screen.height / (float)Screen.width;
+			var scaledScreen = new Vector2(1920, ratio * 1920);
+			GetComponent<CanvasScaler>().referenceResolution = scaledScreen;
 		}
 
-		private void ScaleCanvas()
+		protected override void OnEnable()
+		{	
+			base.OnEnable();
+			EventBus.Subscribe<SetScreenResolutionEvent>(ScaleCanvas);
+		}
+
+		protected override void OnDisable()
+		{	
+			base.OnDisable();
+			EventBus.Unsubscribe<SetScreenResolutionEvent>(ScaleCanvas);
+		}
+
+		protected override void OnDestroy()
+		{
+			base.OnDestroy();
+			EventBus.Unsubscribe<SetScreenResolutionEvent>(ScaleCanvas);
+		}
+
+		private void ScaleCanvas(SetScreenResolutionEvent eventData)
 		{
 			float ratio = Screen.width < Screen.height ? (float)Screen.width / (float)Screen.height : (float)Screen.height / (float)Screen.width;
 			var scaledScreen = new Vector2(1920, ratio * 1920);
@@ -56,16 +73,6 @@ namespace MagmaFlow.Framework.Utils
 			canvasScaler.matchWidthOrHeight = (int) matchResolutionProperty;
 			canvasScaler.referencePixelsPerUnit = 100;
 			canvas.sortingOrder = (int)canvasDrawOrder;
-		}
-
-		private void OnApplicationQuit()
-		{
-			publisher.Unsubscribe(PublisherTopics.SYSTEM_RESERVED_SCREEN_RESOLUTION_SET, ScaleCanvas);
-		}
-
-		private void OnDestroy()
-		{
-			publisher.Unsubscribe(PublisherTopics.SYSTEM_RESERVED_SCREEN_RESOLUTION_SET, ScaleCanvas);
 		}
 	}
 }

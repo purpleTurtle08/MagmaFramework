@@ -1,6 +1,8 @@
 ﻿using System.Collections.Generic;
+using System.Threading.Tasks;
 using UnityEngine;
-using UnityEngine.SceneManagement;
+using UnityEngine.AddressableAssets;
+using UnityEngine.ResourceManagement.AsyncOperations;
 
 namespace MagmaFlow.Framework.Core
 {
@@ -23,111 +25,129 @@ namespace MagmaFlow.Framework.Core
 	public class PooledObjectsManager : MonoBehaviour
 	{	
 		/// <summary>
-		/// The pools of inactive objects
+		/// The pools of inactive objects.
 		/// </summary>
 		private readonly Dictionary<string, Queue<IPoolableObject>> pool = new();
 		/// <summary>
-		/// The massive collection of all the instantiated objects
+		/// The massive collection of all the instantiated objects.
 		/// </summary>
 		private readonly Dictionary<IPoolableObject, string> lookUp = new();
+		/// <summary>
+		/// Stored loaded prefabs, so we don't load them more than once.
+		/// </summary>
+		private readonly Dictionary<string, GameObject> loadedPrefabs = new();
 		/// <summary>
 		/// This is so that our scene inspector doesn't get filled with pooled objects
 		/// </summary>
 		private Transform genericPooledObjectsParent;
 
-		private void OnSceneLoaded(Scene scene, LoadSceneMode loadSceneMode)
-		{
-			if (genericPooledObjectsParent == null)
-			{
-				genericPooledObjectsParent = new GameObject("Pooled Objects Container").transform;
-			}
-		}
-
 		private void Awake()
 		{
-			if (genericPooledObjectsParent == null)
-			{
-				genericPooledObjectsParent = new GameObject("Pooled Objects Container").transform;
-			}
-			SceneManager.sceneLoaded += OnSceneLoaded;
+			genericPooledObjectsParent = new GameObject("Pooled Objects Container").transform;
 		}
 
-		private void OnDestroy()
+		/// <summary>
+		/// Asynchronously loads a prefab from Addressables if it's not already loaded.
+		/// </summary>
+		private async Task<GameObject> GetPrefab(string address)
 		{
-			SceneManager.sceneLoaded -= OnSceneLoaded;
+			if (loadedPrefabs.TryGetValue(address, out var prefab))
+			{
+				return prefab;
+			}
+
+			// Asynchronously load the asset by its address.
+			AsyncOperationHandle<GameObject> handle = Addressables.LoadAssetAsync<GameObject>(address);
+			await handle.Task; // Wait for the loading to complete.
+
+			if (handle.Status == AsyncOperationStatus.Succeeded)
+			{
+				loadedPrefabs[address] = handle.Result;
+				return handle.Result;
+			}
+			else
+			{
+				Debug.LogError($"Prefab not found at address: {address}, make sure that it is marked as adressable");
+				Addressables.Release(handle); // Clean up the failed handle.
+				return null;
+			}
 		}
 
 		/// <summary>
 		/// Internal helper to create and register a new pooled instance.
 		/// </summary>
-		private IPoolableObject CreateNewInstance(string prefabPath)
+		private IPoolableObject CreateNewInstance(GameObject prefab, string prefabAddress)
 		{
-			GameObject loadedPrefab = Resources.Load<GameObject>(prefabPath);
-			if (loadedPrefab == null)
+			if (prefab == null) return null;
+
+			var instance = Instantiate(prefab, genericPooledObjectsParent);
+			if (instance.TryGetComponent<IPoolableObject>(out var pooledObject))
 			{
-				Debug.LogError($"Prefab not found at path: {prefabPath}");
-				return null;
+				lookUp[pooledObject] = prefabAddress;
+				return pooledObject;
 			}
-
-			var instance = Instantiate(loadedPrefab, genericPooledObjectsParent);
-			var pooledObject = instance.GetComponent<IPoolableObject>();
-
-			if (pooledObject == null)
+			else
 			{
-				Debug.LogError($"Prefab {prefabPath} does not implement IPoolableObject\nObject cleaned up");
+				Debug.LogError($"Prefab {prefab.name} does not implement IPoolableObject\nObject cleaned up");
 				Destroy(instance);
 				return null;
 			}
-
-			lookUp[pooledObject] = prefabPath;
-			return pooledObject;
 		}
 
 		/// <summary>
 		/// Prewarm the pool with a number of instances.
 		/// </summary>
-		public void Prewarm(string prefabPath, int count)
+		public async void Prewarm(string prefabAddress, int count)
 		{
-			if (!pool.ContainsKey(prefabPath))
-				pool[prefabPath] = new Queue<IPoolableObject>();
+			if (!pool.ContainsKey(prefabAddress))
+				pool[prefabAddress] = new Queue<IPoolableObject>();
 
-			for (int i = 0; i < count; i++)
+			var objectToPrewarm = await GetPrefab(prefabAddress);
+
+			if (objectToPrewarm != null)
 			{
-				var instance = CreateNewInstance(prefabPath);
-				ReleaseObject(instance);
+				Debug.Log($"Prewarming {count} {objectToPrewarm.name} from {prefabAddress}");
+				for (int i = 0; i < count; i++)
+				{
+					var instance = CreateNewInstance(objectToPrewarm, prefabAddress);
+					ReleaseObject(instance);
+				}
 			}
 		}
 
 		/// <summary>
 		/// Instantiates or retrieves a pooled object and returns the component of type T.
 		/// </summary>
-		public T InstantiatePooledObject<T>(
-			string path,
+		public async Task<T> InstantiatePooledObject<T>(
+			string address,
 			Transform parent,
 			Vector3 position,
 			Quaternion rotation,
 			bool useWorldSpace) where T : Component
 		{
-			if (!pool.TryGetValue(path, out var queue))
+			if (!pool.TryGetValue(address, out var queue))
 			{
 				queue = new Queue<IPoolableObject>();
-				pool[path] = queue;
+				pool[address] = queue;
 			}
 
 			IPoolableObject pooledObject = null;
-
-			// Try to reuse from queue
 			if (queue.Count > 0)
+			{
 				pooledObject = queue.Dequeue();
+			}
 
-			// Otherwise create new
 			if (pooledObject == null || pooledObject.Behaviour == null)
-				pooledObject = CreateNewInstance(path);
+			{
+				// Await the prefab loading before creating a new instance.
+				GameObject prefab = await GetPrefab(address);
+				pooledObject = CreateNewInstance(prefab, address);
+			}
 
-			// Reparent + position
+			if (pooledObject == null) return null;
+
 			var objTransform = pooledObject.Behaviour.transform;
 			objTransform.SetParent(parent ?? genericPooledObjectsParent);
-
 			if (!useWorldSpace)
 			{
 				objTransform.localPosition = position;

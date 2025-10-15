@@ -1,10 +1,11 @@
 using System;
 using System.Globalization;
+using System.Reflection;
 using UnityEngine;
 
 namespace MagmaFlow.Framework.Utils
 {
-	public static class MagmaTextUtils
+	public static class MagmaUtils
 	{
 		/// <summary>
 		/// Returns the time(in seconds) formatted. Checks if hours <= 0
@@ -88,6 +89,35 @@ namespace MagmaFlow.Framework.Utils
 
 			color = Color.white; // fallback
 			return color;
+		}
+
+		/// <summary>
+		/// Clears the console
+		/// NOT RECOMMENDED TO CALL EVERY FRAME
+		/// </summary>
+		public static void ClearConsole()
+		{
+			var logEntries = System.Type.GetType("UnityEditor.LogEntries, UnityEditor.dll");
+			var clearMethod = logEntries.GetMethod("Clear", BindingFlags.Static | BindingFlags.Public);
+			clearMethod.Invoke(null, null);
+		}
+
+		/// <summary>
+		/// This only works for a layer mask that contains a single layer
+		/// </summary>
+		/// <param name="mask"></param>
+		/// <returns></returns>
+		public static int LayerMaskToLayer(LayerMask mask)
+		{
+			int bitmask = mask.value;
+
+			if (bitmask == 0 || (bitmask & (bitmask - 1)) != 0)
+			{
+				Debug.LogError("LayerMask must have exactly one bit set.");
+				return -1; // or throw an exception
+			}
+
+			return (int)Mathf.Log(bitmask, 2);
 		}
 	}
 }
