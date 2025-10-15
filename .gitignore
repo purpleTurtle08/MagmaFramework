@@ -9,7 +9,7 @@ Framework/[Pp]ackages/
 Framework/ProjectSettings/
 Framework/UserSettings/
 Framework/Assets/GIT_IGNORE/
-Framework/Assets/*.meta
+Framework/Assets/GIT_IGNORE.meta
 Framework/.vs/
 Framework/.vsconfig
 /build.windows/
