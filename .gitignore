@@ -2,9 +2,14 @@
 # Unity generated #
 # =============== # 
 Framework/[Ll]ibrary/
+Framework/[Ll]ogs/
 Framework/[Tt]emp/
 Framework/[Oo]bj/
+Framework/[Pp]ackages/
+Framework/ProjectSettings/
+Framework/UserSettings/
 Framework/Assets/GIT_IGNORE/
+Framework/Assets/*.meta
 /build.windows/
 /build.android/
 
