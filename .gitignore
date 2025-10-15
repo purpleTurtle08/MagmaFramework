@@ -1,17 +1,17 @@
 # =============== #
 # Unity generated #
 # =============== # 
-Framework/[Ll]ibrary/
-Framework/[Ll]ogs/
-Framework/[Tt]emp/
-Framework/[Oo]bj/
-Framework/[Pp]ackages/
-Framework/ProjectSettings/
-Framework/UserSettings/
-Framework/Assets/GIT_IGNORE/
-Framework/Assets/GIT_IGNORE.meta
-Framework/.vs/
-Framework/.vsconfig
+UnityProject/[Ll]ibrary/
+UnityProject/[Ll]ogs/
+UnityProject/[Tt]emp/
+UnityProject/[Oo]bj/
+UnityProject/[Pp]ackages/
+UnityProject/ProjectSettings/
+UnityProject/UserSettings/
+UnityProject/Assets/GIT_IGNORE/
+UnityProject/Assets/GIT_IGNORE.meta
+UnityProject/.vs/
+UnityProject/.vsconfig
 /build.windows/
 /build.android/
 
