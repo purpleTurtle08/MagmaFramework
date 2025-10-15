@@ -10,6 +10,7 @@ Framework/ProjectSettings/
 Framework/UserSettings/
 Framework/Assets/GIT_IGNORE/
 Framework/Assets/*.meta
+Framework/.vs/
 /build.windows/
 /build.android/
 
@@ -42,7 +43,4 @@ Thumbs.db
 # ============ #
 # Razvan       #
 # ============ #
-[bB]uilds/
 PersonalResources/
-/build.windows/
-Framework/.vs/
