@@ -11,6 +11,7 @@ Framework/UserSettings/
 Framework/Assets/GIT_IGNORE/
 Framework/Assets/*.meta
 Framework/.vs/
+Framework/.vsconfig
 /build.windows/
 /build.android/
 
