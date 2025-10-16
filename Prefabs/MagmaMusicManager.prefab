@@ -25,13 +25,13 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4006557309385943523}
+  serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!82 &4006557309385943521
 AudioSource:
@@ -42,11 +42,11 @@ AudioSource:
   m_GameObject: {fileID: 4006557309385943523}
   m_Enabled: 1
   serializedVersion: 4
-  OutputAudioMixerGroup: {fileID: 1821138584239095975, guid: a80ee8611cfc27b4391882e70b148156,
-    type: 2}
+  OutputAudioMixerGroup: {fileID: 1821138584239095975, guid: a80ee8611cfc27b4391882e70b148156, type: 2}
   m_audioClip: {fileID: 0}
+  m_Resource: {fileID: 0}
   m_PlayOnAwake: 0
-  m_Volume: 1
+  m_Volume: 0.5
   m_Pitch: 1
   Loop: 0
   Mute: 0
@@ -58,9 +58,9 @@ AudioSource:
   MaxDistance: 500
   Pan2D: 0
   rolloffMode: 0
-  BypassEffects: 0
+  BypassEffects: 1
   BypassListenerEffects: 0
-  BypassReverbZones: 0
+  BypassReverbZones: 1
   rolloffCustomCurve:
     serializedVersion: 2
     m_Curve:
@@ -142,7 +142,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b0f5ab69e1a2a0641a8ed9ab25525b06, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  CrossfadeSpeed: 1.5
-  soundtrackCollection: []
-  shuffleTracks: 1
-  playAsPlaylist: 1
+  referenceVolume: 0.5
+  StartingClipIndex: 0
+  CrossfadeDuration: 1.5
+  playListVolumeFade: 3
+  playList: []
+  shuffleTracks: 0
+  playOnAwake: 0

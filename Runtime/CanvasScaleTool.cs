@@ -26,6 +26,7 @@ namespace MagmaFlow.Framework.Utils
 	/// This tool ensures correct and consistent canvas scaling for your canvases
 	/// </summary>
 	[RequireComponent(typeof(Canvas))]
+	[RequireComponent(typeof(CanvasScaler))]
 	public class CanvasScaleTool : BaseBehaviour
 	{
 		[SerializeField] private CanvasDrawOrder canvasDrawOrder;
@@ -33,9 +34,7 @@ namespace MagmaFlow.Framework.Utils
 
 		private void Awake()
 		{
-			float ratio = Screen.width < Screen.height ? (float)Screen.width / (float)Screen.height : (float)Screen.height / (float)Screen.width;
-			var scaledScreen = new Vector2(1920, ratio * 1920);
-			GetComponent<CanvasScaler>().referenceResolution = scaledScreen;
+			GetComponent<CanvasScaler>().referenceResolution = new Vector2(Screen.width, Screen.height);
 		}
 
 		protected override void OnEnable()
@@ -58,14 +57,16 @@ namespace MagmaFlow.Framework.Utils
 
 		private void ScaleCanvas(SetScreenResolutionEvent eventData)
 		{
-			float ratio = Screen.width < Screen.height ? (float)Screen.width / (float)Screen.height : (float)Screen.height / (float)Screen.width;
-			var scaledScreen = new Vector2(1920, ratio * 1920);
-			GetComponent<CanvasScaler>().referenceResolution = scaledScreen;
+			//float ratio = Screen.width < Screen.height ? (float)Screen.width / (float)Screen.height : (float)Screen.height / (float)Screen.width;
+			//var scaledScreen = new Vector2(1920, ratio * 1920);
+			GetComponent<CanvasScaler>().referenceResolution = new Vector2(eventData.ScreenResolution.width, eventData.ScreenResolution.height);
 		}
 
 		private void OnValidate()
 		{
 			var canvas = GetComponent<Canvas>();
+			canvas.vertexColorAlwaysGammaSpace = true;
+			canvas.additionalShaderChannels = AdditionalCanvasShaderChannels.None;
 			canvas.renderMode = RenderMode.ScreenSpaceOverlay;
 			var canvasScaler = GetComponent<CanvasScaler>();
 			canvasScaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;

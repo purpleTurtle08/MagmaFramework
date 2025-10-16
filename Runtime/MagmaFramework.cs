@@ -53,10 +53,12 @@ namespace MagmaFlow.Framework.Core
 		/// This handles pooled objects
 		/// </summary>
 		public PooledObjectsManager PooledObjectsManager { get; private set; }
-
 		public bool IsGamePaused { get; private set; } = false;
 
-		protected virtual void Awake()
+		private Resolution currentResolution;
+		private FullScreenMode currentScreenMode;
+
+		private void Awake()
 		{
 			if (!Singleton())
 			{
@@ -64,6 +66,15 @@ namespace MagmaFlow.Framework.Core
 			}
 
 			SetupFrameworkCore();
+		}
+
+		private void Update()
+		{
+			if (Screen.width != currentResolution.width || Screen.height != currentResolution.height)
+			{
+				Resolution newResolution = new Resolution { width = Screen.width, height = Screen.height, refreshRateRatio = currentResolution.refreshRateRatio };
+				OnScreenSizeChanged(newResolution);
+			}
 		}
 
 		/// <summary>
@@ -84,6 +95,12 @@ namespace MagmaFlow.Framework.Core
 		private void OnSceneUnloaded(Scene scene)
 		{
 			EventBus.Publish<SceneUnloadedEvent>(new SceneUnloadedEvent(scene));
+		}
+
+		private void OnScreenSizeChanged(Resolution newResolution)
+		{	
+			currentResolution = newResolution;
+			EventBus.Publish(new SetScreenResolutionEvent(currentResolution, currentScreenMode));
 		}
 
 		/// <summary>
@@ -127,19 +144,20 @@ namespace MagmaFlow.Framework.Core
 		}
 
 		/// <summary>
-		/// Sets the game's display resolution
+		/// Sets the game's display resolution.
+		/// Only works at runtime.
 		/// </summary>
 		/// <param name="resolution"></param>
 		/// <param name="mode"></param>
 		public void SetScreenResolution(Resolution resolution, FullScreenMode mode)
 		{
-			#if UNITY_EDITOR
+#if UNITY_EDITOR
 			// If we are inside the editor, we don't do anything
-			#else
+#else
+			currentResolution = resolution;
+			currentScreenMode = mode;
 			Screen.SetResolution(resolution.width, resolution.height, mode, resolution.refreshRateRatio);
-			#endif
-
-			EventBus.Publish(new SetScreenResolutionEvent(resolution, mode));
+#endif
 		}
 
 		/// <summary>
@@ -167,13 +185,13 @@ namespace MagmaFlow.Framework.Core
 		/// </summary>
 		public void Quit()
 		{
-			#if UNITY_EDITOR
+#if UNITY_EDITOR
 			// If in the editor, stop playing
 			EditorApplication.isPlaying = false;
-			#else
+#else
 			// If in a build, quit the application
 			Application.Quit();
-			#endif
+#endif
 		}
 
 		/// <summary>
