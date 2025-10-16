@@ -55,6 +55,7 @@ namespace MagmaFlow.Framework.Core
 		public PooledObjectsManager PooledObjectsManager { get; private set; }
 		public bool IsGamePaused { get; private set; } = false;
 
+		[SerializeField] [Tooltip("This will be used when initializing the PooledObjectsManager.\nA value of 256 is recommended to avoid bloating up the memory with too many pooled instances.\n-1 for no limit")] private int maximumPoolSize = 256;
 		private Resolution currentResolution;
 		private FullScreenMode currentScreenMode;
 
@@ -112,6 +113,7 @@ namespace MagmaFlow.Framework.Core
 			var pooledObjManager = new GameObject("PooledObjectsManager");
 			PooledObjectsManager = pooledObjManager.AddComponent<PooledObjectsManager>();
 			PooledObjectsManager.transform.SetParent(transform);
+			PooledObjectsManager.Initialize(maximumPoolSize);
 			UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoaded;
 			UnityEngine.SceneManagement.SceneManager.sceneUnloaded += OnSceneUnloaded;
 		}

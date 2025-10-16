@@ -5,7 +5,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace MagmaFlow.Framework
+namespace MagmaFlow.Framework.Core
 {	
 	/// <summary>
 	/// This should replace Unity's MonoBehaviour for an array of extended functionality provided by the MagmaFlow Framework

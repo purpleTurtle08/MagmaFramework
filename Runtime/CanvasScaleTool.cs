@@ -1,3 +1,4 @@
+using MagmaFlow.Framework.Core;
 using MagmaFlow.Framework.Events;
 using UnityEngine;
 using UnityEngine.UI;
