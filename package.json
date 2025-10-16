@@ -3,7 +3,7 @@
   "author": "Magma Flow Games",
   "readme": "readme.md",
   "version": "1.0.0",
-  "displayName": "MagmaFlow Framework",
+  "displayName": "Magma Framework",
   "description": "A comprehensive framework for building games in Unity, including object pooling and event management.",
   "unity": "6000.2",
   "dependencies": {
