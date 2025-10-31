@@ -1,4 +1,3 @@
-// The single most important change: Use TextMeshPro instead of legacy UI.Text
 using System.Text;
 using TMPro;
 using UnityEngine;
@@ -132,8 +131,8 @@ namespace MagmaFlow.Framework.Utils
 			return
 				$"Managed GC: {BytesToMB(managedMemory)} MB\n" +
 				$"Mono Used: {BytesToMB(monoUsed)} MB / Mono Heap: {BytesToMB(monoHeap)} MB\n" +
-				$"Unity Total Allocated: {BytesToMB(totalAllocated)} MB\n" +
-				$"Unity Reserved: {BytesToMB(totalReserved)} MB (Unused: {BytesToMB(totalUnused)} MB)";
+				$"Total Allocated: {BytesToMB(totalAllocated)} MB\n" +
+				$"Reserved: {BytesToMB(totalReserved)} MB (Unused: {BytesToMB(totalUnused)} MB)";
 		}
 
 		private static int BytesToMB(long bytes) => Mathf.CeilToInt(bytes / (1024f * 1024f));
@@ -180,9 +179,7 @@ namespace MagmaFlow.Framework.Utils
 
 			}
 		}
-
 #endif
-
 		private void Update()
 		{
 #if UNITY_EDITOR

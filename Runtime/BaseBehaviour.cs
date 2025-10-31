@@ -1,5 +1,4 @@
-﻿using MagmaFlow.Framework.Core;
-using MagmaFlow.Framework.Events;
+﻿using MagmaFlow.Framework.Events;
 using System;
 using System.Collections;
 using System.Collections.Generic;
