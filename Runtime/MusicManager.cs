@@ -36,7 +36,7 @@ namespace MagmaFlow.Framework.Sound
 		private float crossfadeDuration = 1.5f;
 
 		public static MusicManager Instance { get; private set; }
-		public bool IsMuted { get; private set; }
+		public bool IsMuted => musicSource?.volume <= 0.05f ?  true : false;
 		/// <summary>
 		/// This indicates the state of the music manager, NOT if the actual audio source is playing or not.
 		/// </summary>
@@ -55,38 +55,33 @@ namespace MagmaFlow.Framework.Sound
 		public float Volume => currentVolumeTarget;
 
 		/// <summary>
+		/// Sets the reference volume for the music (this is the volume that will be used as a reference for all music volume operations)
+		/// </summary>
+		/// <param name="value"></param>
+		/// <param name="alsoSetVolume"></param>
+		/// <param name="duration"></param>
+		public void SetReferenceVolume(float value, bool alsoSetVolume = false, float duration = 0)
+		{
+			Initialize();
+			referenceVolume = Mathf.Clamp01(value);
+			if (alsoSetVolume)
+			{
+				SetVolume(value, duration);
+			}
+		}
+
+		/// <summary>
 		/// Fades the volume to the provided value
 		/// </summary>
 		/// <param name="value"></param>
 		/// <param name="duration">Duration of the fade in seconds</param>
-		public void SetReferenceVolume(float value, float duration)
+		public void SetVolume(float value, float duration)
 		{
+			Initialize();
 			volumeDifference = Mathf.Abs(value - currentVolumeTarget);
-			currentVolumeTarget = IsMuted ? 0 : Mathf.Clamp01(value);
+			currentVolumeTarget = Mathf.Clamp01(value);
 			crossfadeDuration = duration;
 			interpolateVolume = true;
-		}
-
-		/// <summary>
-		/// Fades the volume of the music to 0
-		/// </summary>
-		/// <param name="crossfadeSpeed">This is the fade duration in seconds</param>
-		public void MuteMusic(float crossfadeSpeed)
-		{
-			Initialize();
-			IsMuted = true;
-			SetReferenceVolume(0, crossfadeSpeed);
-		}
-
-		/// <summary>
-		/// Fades the volume of the music to 1
-		/// </summary>
-		/// <param name="crossfadeSpeed">This is the duration of the fade in seconds</param>
-		public void UnmuteMusic(float crossfadeSpeed)
-		{
-			Initialize();
-			IsMuted = false;
-			SetReferenceVolume(referenceVolume, crossfadeSpeed);
 		}
 
 		/// <summary>
@@ -115,7 +110,7 @@ namespace MagmaFlow.Framework.Sound
 					currentClipIndex = nextClipData.Item2;
 				}
 				musicSource.volume = 0;
-				SetReferenceVolume(referenceVolume, crossfadeSpeed);
+				SetVolume(referenceVolume, crossfadeSpeed);
 				musicSource.Play();
 				IsPlaying = true;
 				isShuffleCrossfading = false;
@@ -131,7 +126,7 @@ namespace MagmaFlow.Framework.Sound
 		{
 			Initialize();
 
-			SetReferenceVolume(0, crossfadeSpeed);
+			SetVolume(0, crossfadeSpeed);
 			onInterpolationFinished = () => { IsPlaying = false; musicSource.Stop(); onFadeComplete?.Invoke(); };
 		}
 
@@ -145,7 +140,7 @@ namespace MagmaFlow.Framework.Sound
 				onInterpolationFinished?.Invoke();
 				onInterpolationFinished = null;
 			}
-			float clampedVolumeDifference = Mathf.Clamp(volumeDifference, .1f, 1f);//We make sure that the distance can't be 0
+			float clampedVolumeDifference = Mathf.Clamp(volumeDifference, .05f, 1f);//We make sure that the distance can't be 0
 			float lerpSpeed = (clampedVolumeDifference / (float)crossfadeDuration) * Time.unscaledDeltaTime;
 			currentVolume = Mathf.MoveTowards(currentVolume, currentVolumeTarget, lerpSpeed);
 			musicSource.volume = currentVolume;
@@ -196,7 +191,8 @@ namespace MagmaFlow.Framework.Sound
 			if (playList == null || playList.Length <= 0) return null;
 
 			int nextClipIndex = -1;
-			if (shuffle)
+			///We also check if the playlist has more than 1 track, as that will lead to an infinite loop
+			if (shuffle && playList.Length > 1)
 			{
 				nextClipIndex = Random.Range(0, playList.Length - 1);
 				while (nextClipIndex == currentClipIndex)
@@ -234,6 +230,7 @@ namespace MagmaFlow.Framework.Sound
 			}
 		}
 
+#if UNITY_EDITOR
 		/// <summary>
 		/// The volume must always be one for music and can be adjusted from the mixer
 		/// </summary>
@@ -247,7 +244,7 @@ namespace MagmaFlow.Framework.Sound
 			audioComponent.bypassEffects = true;
 			audioComponent.bypassReverbZones = true;
 		}
-
+#endif
 	}
 }
 

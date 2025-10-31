@@ -68,5 +68,23 @@ namespace MagmaFlow.Framework.Utils
 		{
 			return 1 << gameObject.layer;
 		}
+
+		/// <summary>
+		/// This only works for a layer mask that contains a single layer
+		/// </summary>
+		/// <param name="mask">This mask must only contain a single layer!</param>
+		/// <returns></returns>
+		public static int LayerMaskToLayer(this LayerMask mask)
+		{
+			int bitmask = mask.value;
+
+			if (bitmask == 0 || (bitmask & (bitmask - 1)) != 0)
+			{
+				Debug.LogError("LayerMask must have exactly one bit set.");
+				return -1; // or throw an exception
+			}
+
+			return (int)Mathf.Log(bitmask, 2);
+		}
 	}
 }
