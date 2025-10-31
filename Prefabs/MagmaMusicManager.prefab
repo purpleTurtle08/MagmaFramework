@@ -142,10 +142,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b0f5ab69e1a2a0641a8ed9ab25525b06, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  autoPlayCrossfadeDuration: 3
   referenceVolume: 0.5
   StartingClipIndex: 0
-  CrossfadeDuration: 1.5
-  playListVolumeFade: 3
   playList: []
   shuffleTracks: 0
   playOnAwake: 0
