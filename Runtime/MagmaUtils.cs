@@ -91,6 +91,7 @@ namespace MagmaFlow.Framework.Utils
 			return color;
 		}
 
+#if UNITY_EDITOR
 		/// <summary>
 		/// Clears the console
 		/// NOT RECOMMENDED TO CALL EVERY FRAME
@@ -101,6 +102,7 @@ namespace MagmaFlow.Framework.Utils
 			var clearMethod = logEntries.GetMethod("Clear", BindingFlags.Static | BindingFlags.Public);
 			clearMethod.Invoke(null, null);
 		}
+#endif
 
 		/// <summary>
 		/// This only works for a layer mask that contains a single layer

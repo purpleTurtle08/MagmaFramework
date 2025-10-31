@@ -23,7 +23,7 @@ namespace MagmaFlow.Framework.Core
 		public void OnRelease();
 	}
 
-	[DefaultExecutionOrder(-10)]
+	[DefaultExecutionOrder(-50)]
 	public class PooledObjectsManager : MonoBehaviour
 	{
 #if UNITY_EDITOR
@@ -43,7 +43,7 @@ namespace MagmaFlow.Framework.Core
 #endif
 
 		/// <summary>
-		/// Due to memory efficiency this should be kept fairly around 50.
+		/// Due to memory efficiency this should be kept fairly around 500.
 		/// No upper bound on the pool means it can grow indefinitely if unused objects accumulate.
 		/// </summary>
 		public int MaximumPoolSize { get; private set; } = 99999999;
@@ -105,8 +105,9 @@ namespace MagmaFlow.Framework.Core
 				{
 					if (handle.IsValid() && handle.Result != null)
 						Addressables.ReleaseInstance(handle.Result);
-
+#if UNITY_EDITOR
 					Debug.Log($"Instantiation of {assetReference.editorAsset.name} was canceled.");
+#endif
 					return null;
 				}
 
@@ -115,8 +116,9 @@ namespace MagmaFlow.Framework.Core
 				{
 					if (handle.IsValid() && handle.Result != null)
 						Addressables.ReleaseInstance(handle.Result);
-
+#if UNITY_EDITOR
 					Debug.LogError($"Failed to instantiate addressable: {assetReference.editorAsset.name}");
+#endif
 					return null;
 				}
 
@@ -138,7 +140,7 @@ namespace MagmaFlow.Framework.Core
 				lookUp[pooledObject] = assetKey;
 				if (!assetNames.ContainsKey(assetKey))
 				{
-					assetNames[assetKey] = assetReference.editorAsset.name;
+					assetNames[assetKey] = instance.name;
 				}
 				return pooledObject;
 			}
@@ -159,7 +161,7 @@ namespace MagmaFlow.Framework.Core
 		/// <param name="maximumPoolSize"></param>
 		public void Initialize(int maximumPoolSize = -1)
 		{
-			MaximumPoolSize = maximumPoolSize >= 0 ? maximumPoolSize : 99999999;
+			MaximumPoolSize = maximumPoolSize >= 0 ? maximumPoolSize : 9999999;
 			var poolRoot = new GameObject("Pooled Objects Container");
 			poolRoot.transform.SetParent(transform);
 			genericPooledObjectsParent = poolRoot.transform;
@@ -180,8 +182,9 @@ namespace MagmaFlow.Framework.Core
 				prewarmCTS = new CancellationTokenSource();
 				if (!pool.ContainsKey(key))
 					pool[key] = new Queue<IPoolableObject>();
-
+#if UNITY_EDITOR
 				Debug.Log($"Prewarming {count} {assetReference.editorAsset.name}...");
+#endif
 				for (int i = 0; i < count; i++)
 				{
 					var instance = await CreateNewInstance(assetReference, prewarmCTS.Token);
@@ -259,14 +262,17 @@ namespace MagmaFlow.Framework.Core
 		}
 
 		/// <summary>
-		/// Releases an object back into the pool.
+		/// Disables the game object.
+		/// Releases the object back into the pool.
 		/// </summary>
 		/// <param name="pooledObject"></param>
 		public void ReleaseObject(IPoolableObject pooledObject)
 		{
-			if (pooledObject == null || !lookUp.ContainsKey(pooledObject))
+			if (pooledObject == null) return;
+
+			if(!lookUp.ContainsKey(pooledObject))
 			{
-				//Debug.LogError("The object you want to release is not pooled.");
+				Debug.LogError($"The object {pooledObject.MonoBehaviour.name}, that you want to release is not pooled.");
 				return;
 			}
 
