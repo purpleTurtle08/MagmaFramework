@@ -34,13 +34,24 @@ namespace MagmaFlow.Framework.Sound
 		//Used to compute volume fade speed
 		private float volumeDifference = 0;
 		private float crossfadeDuration = 1.5f;
-
+		
+		/// <summary>
+		/// 
+		/// </summary>
 		public static MusicManager Instance { get; private set; }
+		/// <summary>
+		/// This uses the audio source's current volume.
+		/// If there's a case where you fade the volume to 0 and then immediately call IsMuted, it will return 'false'.
+		/// Use 'Volume' for such cases.
+		/// </summary>
 		public bool IsMuted => musicSource?.volume <= 0.05f ?  true : false;
 		/// <summary>
 		/// This indicates the state of the music manager, NOT if the actual audio source is playing or not.
 		/// </summary>
 		public bool IsPlaying { get; private set; } = false;
+		/// <summary>
+		/// 
+		/// </summary>
 		public bool ShuffleTracks 
 		{ 
 			get 
@@ -52,6 +63,9 @@ namespace MagmaFlow.Framework.Sound
 				shuffleTracks = value;
 			}
 		}
+		/// <summary>
+		/// 
+		/// </summary>
 		public float Volume => currentVolumeTarget;
 
 		/// <summary>

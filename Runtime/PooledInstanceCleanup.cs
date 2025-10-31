@@ -1,7 +1,10 @@
 using UnityEngine;
 
 namespace MagmaFlow.Framework.Core
-{
+{	
+	/// <summary>
+	/// This will clean-up the reference in the manager, in case that the object is destroyed
+	/// </summary>
 	public class PooledInstanceCleanup : MonoBehaviour
 	{
 		private PooledObjectsManager manager;

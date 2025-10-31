@@ -136,6 +136,7 @@ namespace MagmaFlow.Framework.Core
 
 				//We add a cleanup component that handles removing the entry OnDestroy()
 				instance.AddComponent<PooledInstanceCleanup>().Initialize(this, pooledObject);
+
 				// Register in the appropriate dictionaries
 				lookUp[pooledObject] = assetKey;
 				if (!assetNames.ContainsKey(assetKey))

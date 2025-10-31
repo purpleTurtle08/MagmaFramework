@@ -114,6 +114,7 @@ MonoBehaviour:
     {5}'
   updateInterval: 0.25
   showStaticInfo: 1
+  profileMemory: 1
 --- !u!1 &4924283241400349162
 GameObject:
   m_ObjectHideFlags: 0
@@ -325,9 +326,9 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: '<mspace=0.8em>60.0 AV
+  m_text: '<mspace=0.8em>60 AV
 
-    30.0 LO
+    30 LO
 
     16.7ms</mspace>'
   m_isRightToLeft: 0
