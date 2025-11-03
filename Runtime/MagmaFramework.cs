@@ -206,6 +206,7 @@ namespace MagmaFlow.Framework.Core
 		}
 
 		/// <summary>
+		/// !!WARNING!! If you affect time scale, you might want to make sure that your Animator / Other components run on unscaledDeltaTime (where it is the case)
 		/// Pause/unpause the game
 		/// </summary>
 		/// <param name="value">True is game pause, false is unpaused</param>

@@ -10,9 +10,9 @@ namespace MagmaFlow.Framework.Sound
 	public class MusicManager : MonoBehaviour
 	{
 		[SerializeField]
-		[Tooltip("The duration in seconds for a track to fade out and the next track fades in during automatic playback.")]
+		[Tooltip("The duration in seconds for a track to fade out and the next track fades in during automatic playback. This is not a cross-fade")]
 		[Range(0f, 10f)]
-		private float autoPlayCrossfadeDuration = 3f;
+		private float autoPlayFadeDuration = 3f;
 		[SerializeField] [Range(0f, 1f)] private float referenceVolume = 1;
 		[Tooltip("The index of the first clip that should be played")] public int StartingClipIndex = 0;
 		[SerializeField] private AudioClip[] playList;
@@ -172,14 +172,14 @@ namespace MagmaFlow.Framework.Sound
 			}
 
 			var nextClipData = GetNextClip(shuffleTracks);
-			PlayMusic(autoPlayCrossfadeDuration, nextClipData.Item2);
+			PlayMusic(autoPlayFadeDuration, nextClipData.Item2);
 		}
 
 		private void Awake()
 		{
 			Singleton();
 
-			if (playOnAwake) PlayMusic(autoPlayCrossfadeDuration, currentClipIndex);
+			if (playOnAwake) PlayMusic(autoPlayFadeDuration, currentClipIndex);
 		}
 
 		private void Update()
@@ -192,7 +192,7 @@ namespace MagmaFlow.Framework.Sound
 			if (IsPlaying && !isShuffleCrossfading && musicSource.clip != null && musicSource.isPlaying)
 			{
 				// If the remaining time is less than the fade duration, start the next track
-				if (musicSource.clip.length - musicSource.time <= autoPlayCrossfadeDuration)
+				if (musicSource.clip.length - musicSource.time <= autoPlayFadeDuration)
 				{
 					isShuffleCrossfading = true;
 					ShuffleMusic();   
@@ -235,7 +235,7 @@ namespace MagmaFlow.Framework.Sound
 			if (Instance != null && Instance != this) 
 			{
 				Debug.LogWarning($"Removed {gameObject.name}, as it is a duplicate MusicManager. Ensure you only have 1 MusicManager per scene");
-				DestroyImmediate(gameObject);
+				Destroy(gameObject);
 			}
 			else
 			{

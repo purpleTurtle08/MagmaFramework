@@ -49,6 +49,10 @@ namespace MagmaFlow.Framework.Core
 		public int MaximumPoolSize { get; private set; } = 99999999;
 
 		/// <summary>
+		/// This dictionary contains the loaded assets 
+		/// </summary>
+		private Dictionary<object, AsyncOperationHandle<GameObject>> loadedAssets = new();
+		/// <summary>
 		/// One CTS per prewarm request (key = asset runtime key), avoid passing CTS logic to the caller
 		/// </summary>
 		private readonly Dictionary<object, CancellationTokenSource> prewarmTokens = new();
@@ -99,35 +103,30 @@ namespace MagmaFlow.Framework.Core
 			}
 
 			var assetKey = assetReference.RuntimeKey;
-			AsyncOperationHandle<GameObject> handle = assetReference.InstantiateAsync(genericPooledObjectsParent);
+
 			try
 			{
 				// Await completion, there's no way of stopping/cancelling this handle
-				await handle.Task;
+				var loadedAsset = await GetPrefabAsync(assetReference);
 
 				// Handle early cancellation before continuing
 				if (cancellationToken.IsCancellationRequested)
 				{
-					if (handle.IsValid() && handle.Result != null)
-						Addressables.ReleaseInstance(handle.Result);
 #if UNITY_EDITOR
 					Debug.Log($"Instantiation of {assetReference.editorAsset.name} was cancelled.");
 #endif
 					return null;
 				}
 
-				// Check handle result
-				if (handle.Status != AsyncOperationStatus.Succeeded || handle.Result == null)
+				if(loadedAsset == null)
 				{
-					if (handle.IsValid() && handle.Result != null)
-						Addressables.ReleaseInstance(handle.Result);
 #if UNITY_EDITOR
-					Debug.LogError($"Failed to instantiate addressable: {assetReference.editorAsset.name}");
+					Debug.Log($"There was an issue loading {assetReference.editorAsset.name} asset.");
 #endif
 					return null;
 				}
 
-				GameObject instance = handle.Result;
+				var instance = Instantiate(loadedAsset);
 
 				// Verify it implements IPoolableObject
 				if (!instance.TryGetComponent<IPoolableObject>(out var pooledObject))
@@ -135,11 +134,12 @@ namespace MagmaFlow.Framework.Core
 					Debug.LogError(
 						$"The prefab '{instance.name}' does not implement IPoolableObject. Cleaning up."
 					);
-					Addressables.ReleaseInstance(instance);
+					Destroy(instance);
+
 					return null;
 				}
 
-				//We add a cleanup component that handles removing the entry OnDestroy()
+				//We add a cleanup component that handles removing the entry OnDestroy() from the lookup table
 				instance.AddComponent<PooledInstanceCleanup>().Initialize(this, pooledObject);
 
 				// Register in the appropriate dictionaries
@@ -153,12 +153,35 @@ namespace MagmaFlow.Framework.Core
 			catch (Exception e)
 			{
 				// If something goes wrong during await
-				if (handle.IsValid() && handle.Result != null)
-					Addressables.ReleaseInstance(handle.Result);
+				//if (handle.IsValid() && handle.Result != null)
+				//	Addressables.ReleaseInstance(handle.Result);
 
 				Debug.LogException(e);
 				return null;
 			}
+		}
+
+		private async Task<GameObject> GetPrefabAsync(AssetReference assetReference)
+		{
+			object key = assetReference.RuntimeKey;
+
+			// 1. Check if we already have it loaded (or are loading it)
+			if (loadedAssets.TryGetValue(key, out var handle))
+			{
+				// We have a handle, so just wait for it to finish if it's not already
+				await handle.Task;
+				return handle.Result; // This is the GameObject prefab
+			}
+
+			// 2. If not, load it for the first time
+			var loadHandle = Addressables.LoadAssetAsync<GameObject>(assetReference);
+
+			// 3. Store the *handle* in the dictionary immediately
+			loadedAssets[key] = loadHandle;
+
+			// 4. Await the new handle and return the prefab
+			await loadHandle.Task;
+			return loadHandle.Result;
 		}
 
 		/// <summary>
@@ -166,13 +189,10 @@ namespace MagmaFlow.Framework.Core
 		/// </summary>
 		public void CancelPrewarmOperations()
 		{
-			// Cancel + dispose all prewarm CTS
 			foreach (var cts in prewarmTokens.Values)
 			{
 				cts.Cancel();
-				cts.Dispose();
 			}
-			prewarmTokens.Clear();
 		}
 
 		/// <summary>
@@ -180,13 +200,10 @@ namespace MagmaFlow.Framework.Core
 		/// </summary>
 		public void CancelInstantiateOperation()
 		{
-			// Cancel + dispose all instantiation CTS
 			foreach (var cts in activeInstantiations)
 			{
 				cts.Cancel();
-				cts.Dispose();
 			}
-			activeInstantiations.Clear();
 		}
 
 		/// <summary>
@@ -280,14 +297,23 @@ namespace MagmaFlow.Framework.Core
 			if (pooledObject == null || pooledObject.MonoBehaviour == null)
 			{
 				var cts = new CancellationTokenSource();
-				activeInstantiations.Add(cts);
 
-				pooledObject = await CreateNewInstance(assetReference, cts.Token);
-
-				activeInstantiations.Remove(cts);
-				cts.Dispose();
+				try
+				{
+					activeInstantiations.Add(cts);
+					pooledObject = await CreateNewInstance(assetReference, cts.Token);
+				}
+				catch(Exception e)
+				{
+					Debug.LogException(e);
+				}
+				finally
+				{
+					activeInstantiations.Remove(cts);
+					cts.Dispose();
+				}
 			}
-
+			
 			if (pooledObject == null)
 				return null;
 
@@ -333,13 +359,14 @@ namespace MagmaFlow.Framework.Core
 			var assetReference = lookUp[pooledObject];
 
 			if (pool[assetReference].Count >= MaximumPoolSize)
-				Addressables.ReleaseInstance(pooledObject.MonoBehaviour.gameObject);
+				Destroy(pooledObject.MonoBehaviour.gameObject);
 			else
 				pool[assetReference].Enqueue(pooledObject);
 		}
 
 		/// <summary>
-		/// Destroys all pooled objects.
+		/// Destroys ALL objects managed by this pool (both active and inactive),
+		/// Cancels all operations, and releases all loaded Addressable assets.
 		/// </summary>
 		/// <param name="cancelPrewarmOperations">If this is set to true, the active prewarm operations will be cancelled</param>
 		/// <param name="cancelInstantiateOperations">If set to true, all active instantiation operations will be cancelled</param>
@@ -351,14 +378,45 @@ namespace MagmaFlow.Framework.Core
 			if (cancelPrewarmOperations)
 				CancelPrewarmOperations();
 
-			foreach (var entry in lookUp.Keys)
+			// 1. Destroy all INACTIVE objects (in the queues)
+			foreach (var queue in pool.Values)
 			{
-				if (entry?.MonoBehaviour != null)
-					Addressables.ReleaseInstance(entry.MonoBehaviour.gameObject);
+				while (queue.Count > 0)
+				{
+					var pooledObject = queue.Dequeue();
+					if (pooledObject != null && pooledObject.MonoBehaviour != null)
+					{
+						// This will NOT trigger PooledInstanceCleanup because
+						// the object is not in the 'lookUp' dictionary.
+						Destroy(pooledObject.MonoBehaviour.gameObject);
+					}
+				}
+			}
+			pool.Clear();
+
+			// 2. Destroy all ACTIVE objects (in the lookup)
+			// We MUST copy to a new List, because PooledInstanceCleanup.OnDestroy()
+			// will modify the 'lookUp' dictionary as we iterate.
+			var activeObjects = new List<IPoolableObject>(lookUp.Keys);
+			foreach (var pooledObject in activeObjects)
+			{
+				if (pooledObject != null && pooledObject.MonoBehaviour != null)
+				{
+					Destroy(pooledObject.MonoBehaviour.gameObject);
+				}
 			}
 
-			pool.Clear();
+			// By now, PooledInstanceCleanup should have cleared the lookup.
+			// We clear it just in case of any stragglers.
 			lookUp.Clear();
+
+			// 3. Now that all GameObjects are destroyed, release the assets.
+			foreach (var entry in loadedAssets.Values)
+			{
+				Addressables.Release(entry);
+			}
+			loadedAssets.Clear();
+			assetNames.Clear();
 		}
 	}
 }

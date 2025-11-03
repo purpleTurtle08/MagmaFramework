@@ -52,7 +52,7 @@ namespace MagmaFlow.Framework.Utils
 		private double _lastLowFpsUpdateTime;
 		private readonly double _memoryReportInterval = 2;
 		private readonly float _lowFpsUpdateInterval = 1f;
-
+		private readonly StringBuilder _stringBuilder = new StringBuilder(256);
 		// --- Improvement 2: Track peak frame time for a more stable "Low FPS" ---
 		// Track the highest frame time (ms) in the interval instead of the instantaneous lowest FPS.
 		private float _highMs;
@@ -231,12 +231,12 @@ namespace MagmaFlow.Framework.Utils
 					_memoryReport = "";
 				}
 
-				StringBuilder myStringBuilder = new StringBuilder(string.Empty);
-				myStringBuilder.AppendFormat("<mspace=0.8em>{0} AVG", Mathf.FloorToInt((float)avgFps));
-				myStringBuilder.AppendFormat("\n{0} LOW", Mathf.FloorToInt(_lowestFps));
-				myStringBuilder.AppendFormat("\n{0:F} FMS</mspace>", (float)avgMs);
-				myStringBuilder.Append($"\n{_memoryReport}");
-				_dynamicTextMesh.SetText(myStringBuilder);
+				_stringBuilder.Clear();
+				_stringBuilder.AppendFormat("<mspace=0.8em>{0} AVG", Mathf.FloorToInt((float)avgFps));
+				_stringBuilder.AppendFormat("\n{0} LOW", Mathf.FloorToInt(_lowestFps));
+				_stringBuilder.AppendFormat("\n{0:F} FMS</mspace>", (float)avgMs);
+				_stringBuilder.Append($"\n{_memoryReport}");
+				_dynamicTextMesh.SetText(_stringBuilder);
 
 				// Reset counters for next interval
 				_frameCount = 0;

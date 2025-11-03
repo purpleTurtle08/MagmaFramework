@@ -1,8 +1,6 @@
-using Newtonsoft.Json;
 using System;
 using System.Globalization;
 using System.IO;
-using System.IO.Compression;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
@@ -72,11 +70,10 @@ namespace MagmaFlow.Framework.Utils
 			// split the items
 			string[] sArray = vector3.Split(',');
 
-			// store as a Vector3
 			UnityEngine.Vector3 result = new UnityEngine.Vector3(
-				float.Parse(sArray[0]),
-				float.Parse(sArray[1]),
-				float.Parse(sArray[2]));
+				float.Parse(sArray[0], CultureInfo.InvariantCulture),
+				float.Parse(sArray[1], CultureInfo.InvariantCulture),
+				float.Parse(sArray[2], CultureInfo.InvariantCulture));
 
 			return result;
 		}
@@ -114,7 +111,7 @@ namespace MagmaFlow.Framework.Utils
 
 			try
 			{
-				var result = await File.ReadAllTextAsync(filePath, DefaultEncoding).ConfigureAwait(false);
+				var result = await File.ReadAllTextAsync(filePath, DefaultEncoding);
 				return result;
 			}
 			catch (Exception ex)
@@ -137,7 +134,7 @@ namespace MagmaFlow.Framework.Utils
 
 			try
 			{
-				var readTask = await File.ReadAllBytesAsync(filePath).ConfigureAwait(false);
+				var readTask = await File.ReadAllBytesAsync(filePath);
 				return readTask;
 			}
 			catch (Exception ex)
@@ -171,7 +168,7 @@ namespace MagmaFlow.Framework.Utils
 			try
 			{
 				// Write to temp file
-				await File.WriteAllBytesAsync(tempFile, data).ConfigureAwait(false);
+				await File.WriteAllBytesAsync(tempFile, data);
 
 				// Replace existing file atomically (or create if it doesn't exist)
 				File.Copy(tempFile, filePath, overwrite: true);
@@ -213,7 +210,7 @@ namespace MagmaFlow.Framework.Utils
 			try
 			{
 				// Write to temp file
-				await File.WriteAllTextAsync(tempFile, text).ConfigureAwait(false);
+				await File.WriteAllTextAsync(tempFile, text);
 
 				// Replace existing file atomically (or create if it doesn't exist)
 				File.Copy(tempFile, filePath, overwrite: true);
