@@ -49,6 +49,14 @@ namespace MagmaFlow.Framework.Core
 		public int MaximumPoolSize { get; private set; } = 99999999;
 
 		/// <summary>
+		/// One CTS per prewarm request (key = asset runtime key), avoid passing CTS logic to the caller
+		/// </summary>
+		private readonly Dictionary<object, CancellationTokenSource> prewarmTokens = new();
+		/// <summary>
+		/// Track all ongoing instantiations (for global cancel on destroy and avoid passing CTS logic to the caller)
+		/// </summary>
+		private readonly HashSet<CancellationTokenSource> activeInstantiations = new();
+		/// <summary>
 		/// The pools of inactive objects.
 		/// </summary>
 		private readonly Dictionary<object, Queue<IPoolableObject>> pool = new();
@@ -68,15 +76,12 @@ namespace MagmaFlow.Framework.Core
 		/// This is so that our scene inspector doesn't get filled with pooled objects
 		/// </summary>
 		private Transform genericPooledObjectsParent;
-		private CancellationTokenSource prewarmCTS;
-		private CancellationTokenSource instantiateCTS;
+
 		internal void RemoveLookup(IPoolableObject obj) => lookUp.Remove(obj);
 
 		private void OnDestroy()
-		{	
-			prewarmCTS?.Cancel();
-			instantiateCTS?.Cancel();
-			ClearObjectPools();
+		{
+			ClearObjectPools(true, true);
 		}
 
 		/// <summary>
@@ -97,7 +102,7 @@ namespace MagmaFlow.Framework.Core
 			AsyncOperationHandle<GameObject> handle = assetReference.InstantiateAsync(genericPooledObjectsParent);
 			try
 			{
-				// Await completion (will throw if Task is canceled)
+				// Await completion, there's no way of stopping/cancelling this handle
 				await handle.Task;
 
 				// Handle early cancellation before continuing
@@ -106,7 +111,7 @@ namespace MagmaFlow.Framework.Core
 					if (handle.IsValid() && handle.Result != null)
 						Addressables.ReleaseInstance(handle.Result);
 #if UNITY_EDITOR
-					Debug.Log($"Instantiation of {assetReference.editorAsset.name} was canceled.");
+					Debug.Log($"Instantiation of {assetReference.editorAsset.name} was cancelled.");
 #endif
 					return null;
 				}
@@ -157,6 +162,34 @@ namespace MagmaFlow.Framework.Core
 		}
 
 		/// <summary>
+		/// Stops all the prewarm operations
+		/// </summary>
+		public void CancelPrewarmOperations()
+		{
+			// Cancel + dispose all prewarm CTS
+			foreach (var cts in prewarmTokens.Values)
+			{
+				cts.Cancel();
+				cts.Dispose();
+			}
+			prewarmTokens.Clear();
+		}
+
+		/// <summary>
+		/// Stops all instantiating operations
+		/// </summary>
+		public void CancelInstantiateOperation()
+		{
+			// Cancel + dispose all instantiation CTS
+			foreach (var cts in activeInstantiations)
+			{
+				cts.Cancel();
+				cts.Dispose();
+			}
+			activeInstantiations.Clear();
+		}
+
+		/// <summary>
 		/// Due to memory constraints you can set a maximum pool size, or leave it -1
 		/// </summary>
 		/// <param name="maximumPoolSize"></param>
@@ -176,11 +209,14 @@ namespace MagmaFlow.Framework.Core
 		public async Task Prewarm(AssetReference assetReference, int count)
 		{
 			var key = assetReference.RuntimeKey;
-			if (!currentlyPrewarming.Add(key)) return;
+			if (!currentlyPrewarming.Add(key))
+				return;
+
+			CancellationTokenSource cts = new CancellationTokenSource();
+			prewarmTokens[key] = cts;
 
 			try
 			{
-				prewarmCTS = new CancellationTokenSource();
 				if (!pool.ContainsKey(key))
 					pool[key] = new Queue<IPoolableObject>();
 #if UNITY_EDITOR
@@ -188,14 +224,25 @@ namespace MagmaFlow.Framework.Core
 #endif
 				for (int i = 0; i < count; i++)
 				{
-					var instance = await CreateNewInstance(assetReference, prewarmCTS.Token);
-					if (instance == null) { return; }
+					if (cts.Token.IsCancellationRequested)
+						break;
+
+					var instance = await CreateNewInstance(assetReference, cts.Token);
+					if (instance == null)
+						break;
+
 					ReleaseObject(instance);
 				}
 			}
 			finally
 			{
 				currentlyPrewarming.Remove(key);
+
+				// Remove and dispose CTS
+				if (prewarmTokens.Remove(key))
+				{
+					cts.Dispose();
+				}
 			}
 		}
 
@@ -208,7 +255,6 @@ namespace MagmaFlow.Framework.Core
 		/// <param name="position"></param>
 		/// <param name="rotation"></param>
 		/// <param name="useWorldSpace"></param>
-		/// <param name="setActive"></param>
 		/// <returns></returns>
 		public async Task<T> InstantiatePooledObject<T>(
 			AssetReference assetReference,
@@ -220,7 +266,7 @@ namespace MagmaFlow.Framework.Core
 			if (assetReference == null)
 			{
 				Debug.LogError("The asset reference that you want to instantiate is null.");
-				return null; 
+				return null;
 			}
 
 			if (!pool.TryGetValue(assetReference.RuntimeKey, out var queue))
@@ -229,22 +275,25 @@ namespace MagmaFlow.Framework.Core
 				pool[assetReference.RuntimeKey] = queue;
 			}
 
-			IPoolableObject pooledObject = null;
-			if (queue.Count > 0)
-			{
-				pooledObject = queue.Dequeue();
-			}
+			IPoolableObject pooledObject = queue.Count > 0 ? queue.Dequeue() : null;
 
 			if (pooledObject == null || pooledObject.MonoBehaviour == null)
 			{
-				instantiateCTS = new CancellationTokenSource();
-				pooledObject = await CreateNewInstance(assetReference, instantiateCTS.Token);
+				var cts = new CancellationTokenSource();
+				activeInstantiations.Add(cts);
+
+				pooledObject = await CreateNewInstance(assetReference, cts.Token);
+
+				activeInstantiations.Remove(cts);
+				cts.Dispose();
 			}
 
-			if (pooledObject == null) return null;
+			if (pooledObject == null)
+				return null;
 
 			var objTransform = pooledObject.MonoBehaviour.transform;
 			objTransform.SetParent(parent ?? genericPooledObjectsParent);
+
 			if (!useWorldSpace)
 			{
 				objTransform.localPosition = position;
@@ -292,10 +341,15 @@ namespace MagmaFlow.Framework.Core
 		/// <summary>
 		/// Destroys all pooled objects.
 		/// </summary>
-		public void ClearObjectPools()
+		/// <param name="cancelPrewarmOperations">If this is set to true, the active prewarm operations will be cancelled</param>
+		/// <param name="cancelInstantiateOperations">If set to true, all active instantiation operations will be cancelled</param>
+		public void ClearObjectPools(bool cancelPrewarmOperations = false, bool cancelInstantiateOperations = false)
 		{
-			prewarmCTS?.Cancel();
-			instantiateCTS?.Cancel();
+			if (cancelInstantiateOperations)
+				CancelInstantiateOperation();
+
+			if (cancelPrewarmOperations)
+				CancelPrewarmOperations();
 
 			foreach (var entry in lookUp.Keys)
 			{

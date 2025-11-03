@@ -14,6 +14,7 @@ namespace MagmaFlow.Framework.Utils
 	[SelectionBase]
 	[DisallowMultipleComponent]
 	[RequireComponent(typeof(Canvas))]
+	[RequireComponent(typeof(CanvasScaler))]
 #if UNITY_EDITOR
 	[ExecuteInEditMode]
 #endif
@@ -151,8 +152,12 @@ namespace MagmaFlow.Framework.Utils
 
 			var canvasScaler = GetComponent<CanvasScaler>();
 			var canvas = GetComponent<Canvas>();
+
+			canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+			canvas.pixelPerfect = false;
 			canvas.sortingOrder = 9999;
 			canvas.additionalShaderChannels = AdditionalCanvasShaderChannels.TexCoord1;
+			canvasScaler.referenceResolution = new Vector2(1920, 1080);
 			canvasScaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
 			canvasScaler.matchWidthOrHeight = 0;
 			if (TryGetComponent<GraphicRaycaster>(out var raycaster))

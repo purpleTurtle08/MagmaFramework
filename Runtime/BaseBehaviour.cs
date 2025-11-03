@@ -2,7 +2,9 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.AddressableAssets;
 
 namespace MagmaFlow.Framework.Core
 {	
@@ -54,7 +56,9 @@ namespace MagmaFlow.Framework.Core
 		protected virtual void OnSceneUnloaded(SceneUnloadedEvent eventData) { }
 		protected virtual void OnDestroy()
 		{
-			OnDisable();
+			EventBus.Unsubscribe<GamePausedEvent>(OnGamePaused);
+			EventBus.Unsubscribe<SceneLoadedEvent>(OnSceneLoaded);
+			EventBus.Unsubscribe<SceneUnloadedEvent>(OnSceneUnloaded);
 		}
 		protected virtual void OnEnable()
 		{
@@ -178,6 +182,71 @@ namespace MagmaFlow.Framework.Core
 			temp?.transform.SetParent(parent);
 
 			return temp;
+		}
+
+		/// <summary>
+		/// Instantiates an object using an asset refference
+		/// </summary>
+		/// <typeparam name="T"></typeparam>
+		/// <param name="assetReference"></param>
+		/// <param name="parent"></param>
+		/// <param name="position"></param>
+		/// <param name="rotation"></param>
+		/// <returns></returns>
+		protected async Task<T> InstantiateAddressable<T>
+		(
+			AssetReference assetReference,
+			Transform parent,
+			Vector3 position,
+			Quaternion rotation
+		) where T : Component
+		{
+			if (assetReference == null || assetReference.RuntimeKeyIsValid() == false)
+			{
+				Debug.LogError("Instantiate addressable called with a null or invalid AssetReference.");
+				return null;
+			}
+
+			try
+			{
+				GameObject instantiatedObject = await Addressables.InstantiateAsync(
+					assetReference,
+					position,
+					rotation,
+					parent
+				).Task;
+
+				// 2. Check if the *instantiatedObject* has the component.
+				if (instantiatedObject == null)
+				{
+#if UNITY_EDITOR
+					// This can happen if the operation is cancelled or fails
+					Debug.LogError($"Failed to instantiate Addressable: {assetReference.editorAsset.name}");
+#endif
+					return null;
+				}
+
+				if (instantiatedObject.TryGetComponent<T>(out var component))
+				{	
+					instantiatedObject.AddComponent<InstantiatedAddressableCleanup>();
+					return component;
+				}
+				else
+				{
+					Debug.LogError(
+						$"The instantiated prefab '{instantiatedObject.name}' does not have the component {typeof(T)}. Cleaning up."
+					);
+	
+					Addressables.ReleaseInstance(instantiatedObject);
+					return null;
+				}
+			}
+			catch (Exception e)
+			{
+				// Handle exceptions during the async operation
+				Debug.LogException(e);
+				return null;
+			}
 		}
 
 		#endregion Custom GameObject Creation

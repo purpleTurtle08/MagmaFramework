@@ -42,7 +42,7 @@ namespace MagmaFlow.Framework.Core
 	/// 
 	/// RECOMMENDED: Create your own game core script and inherit the MagmaFramework core behaviour or simply make a separate singleton
 	/// </summary>
-	[DefaultExecutionOrder(-100)]
+	[DefaultExecutionOrder(-200)]
 	public class MagmaFramework : MonoBehaviour
 	{	
 		/// <summary>
@@ -55,7 +55,7 @@ namespace MagmaFlow.Framework.Core
 		public PooledObjectsManager PooledObjectsManager { get; private set; }
 		public bool IsGamePaused { get; private set; } = false;
 
-		[SerializeField] [Tooltip("This will be used when initializing the PooledObjectsManager.\nA value of 256 is recommended to avoid bloating up the memory with too many pooled instances.\n-1 for no limit")] private int maximumPoolSize = 256;
+		[SerializeField] [Tooltip("This will be used when initializing the PooledObjectsManager.\nA value of 256 is recommended to avoid bloating up the memory with too many pooled instances.\n-1 for no limit")] private int maximumPoolSize = -1;
 		private Resolution currentResolution;
 		private FullScreenMode currentScreenMode;
 
