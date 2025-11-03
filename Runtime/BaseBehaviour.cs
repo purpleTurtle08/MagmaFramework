@@ -37,7 +37,7 @@ namespace MagmaFlow.Framework.Core
 			foreach (var hitCollider in colliders)
 			{
 				if (Physics.ComputePenetration(
-					thisCollider, transform.position, Quaternion.identity,
+					thisCollider, transform.position, transform.rotation,
 					hitCollider, hitCollider.transform.position, hitCollider.transform.rotation,
 					out Vector3 direction, out float distance))
 				{
