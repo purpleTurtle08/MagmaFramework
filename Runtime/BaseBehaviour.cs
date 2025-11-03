@@ -193,7 +193,7 @@ namespace MagmaFlow.Framework.Core
 		/// <param name="position"></param>
 		/// <param name="rotation"></param>
 		/// <returns></returns>
-		protected async Task<T> InstantiateAddressable<T>
+		protected async Task<T> InstantiateAddressableAsync<T>
 		(
 			AssetReference assetReference,
 			Transform parent,
@@ -246,6 +246,43 @@ namespace MagmaFlow.Framework.Core
 				// Handle exceptions during the async operation
 				Debug.LogException(e);
 				return null;
+			}
+		}
+
+		/// <summary>
+		/// Wrapper over InstantiateAddressableAsync() for better usability
+		/// </summary>
+		/// <typeparam name="T"></typeparam>
+		/// <param name="assetReference"></param>
+		/// <param name="parent"></param>
+		/// <param name="position"></param>
+		/// <param name="rotation"></param>
+		/// <param name="onComplete"></param>
+		public void InstantiateAddressable<T>
+		(
+			AssetReference assetReference,
+			Transform parent,
+			Vector3 position,
+			Quaternion rotation,
+			Action<T> onComplete = null
+		) where T : Component
+		{
+			try
+			{
+
+				_ = InstantiateAddressableAsync<T>(assetReference, parent, position, rotation).ContinueWith(task =>
+				{
+					if (task.IsCompletedSuccessfully)
+					{
+						onComplete?.Invoke(task.Result);
+					}
+				});
+			}
+			catch (Exception e) 
+			{
+#if UNITY_EDITOR
+				Debug.LogException(new Exception($"An error occurred during {assetReference.editorAsset.name} instantiation.", e));
+#endif
 			}
 		}
 
