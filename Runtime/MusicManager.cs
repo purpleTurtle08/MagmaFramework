@@ -76,7 +76,8 @@ namespace MagmaFlow.Framework.Sound
 		/// <param name="duration"></param>
 		public void SetReferenceVolume(float value, bool alsoSetVolume = false, float duration = 0)
 		{
-			Initialize();
+			if (!isInitialized) return;
+
 			referenceVolume = Mathf.Clamp01(value);
 			if (alsoSetVolume)
 			{
@@ -91,7 +92,8 @@ namespace MagmaFlow.Framework.Sound
 		/// <param name="duration">Duration of the fade in seconds</param>
 		public void SetVolume(float value, float duration)
 		{
-			Initialize();
+			if (!isInitialized) return;
+
 			volumeDifference = Mathf.Abs(value - currentVolumeTarget);
 			currentVolumeTarget = Mathf.Clamp01(value);
 			crossfadeDuration = duration;
@@ -106,8 +108,8 @@ namespace MagmaFlow.Framework.Sound
 		/// <param name="overrideClipIndex"></param>
 		public void PlayMusic(float crossfadeSpeed, int overrideClipIndex = -1)
 		{
+			if (!isInitialized) return;
 			if (playList == null || playList.Length <= 0) return;
-			Initialize();
 
 			StopMusic(crossfadeSpeed, () => 
 			{
@@ -138,7 +140,7 @@ namespace MagmaFlow.Framework.Sound
 		/// <param name="onFadeComplete"></param>
 		public void StopMusic(float crossfadeSpeed, UnityAction onFadeComplete = null)
 		{
-			Initialize();
+			if (!isInitialized) return;
 
 			SetVolume(0, crossfadeSpeed);
 			onInterpolationFinished = () => { IsPlaying = false; musicSource.Stop(); onFadeComplete?.Invoke(); };
@@ -146,8 +148,6 @@ namespace MagmaFlow.Framework.Sound
 
 		private void LerpCurrentVolume()
 		{
-			if (!interpolateVolume) return;
-
 			if(currentVolume == currentVolumeTarget)
 			{
 				interpolateVolume = false;
@@ -177,8 +177,12 @@ namespace MagmaFlow.Framework.Sound
 
 		private void Awake()
 		{
-			Singleton();
+			if (!Singleton())
+			{
+				return;
+			}
 
+			Initialize();
 			if (playOnAwake) PlayMusic(autoPlayFadeDuration, currentClipIndex);
 		}
 
@@ -186,7 +190,7 @@ namespace MagmaFlow.Framework.Sound
 		{
 			if (!isInitialized) return;
 
-			LerpCurrentVolume();
+			if (!interpolateVolume) LerpCurrentVolume();
 
 			// Check if we should start a crossfade for the next track
 			if (IsPlaying && !isShuffleCrossfading && musicSource.clip != null && musicSource.isPlaying)
@@ -230,18 +234,22 @@ namespace MagmaFlow.Framework.Sound
 			isInitialized = true;
 		}
 
-		private void Singleton()
+		/// <summary>
+		/// This ensures that there can only be one object of this type per scene
+		/// </summary>
+		private bool Singleton()
 		{
 			if (Instance != null && Instance != this) 
 			{
-				Debug.LogWarning($"Removed {gameObject.name}, as it is a duplicate MusicManager. Ensure you only have 1 MusicManager per scene");
+				Debug.LogWarning($"Removed {gameObject.name}, as it is a duplicate MusicManager. Ensure you only have 1 MusicManager per scene.");
 				Destroy(gameObject);
+				return false;
 			}
-			else
-			{
-				Instance = this;
-				Initialize();
-			}
+
+			Instance = this;
+			DontDestroyOnLoad(gameObject);
+			Debug.Log("Music Manager initialized.");
+			return true;
 		}
 
 #if UNITY_EDITOR
@@ -250,6 +258,8 @@ namespace MagmaFlow.Framework.Sound
 		/// </summary>
 		private void OnValidate()
 		{
+			if (Application.isPlaying) return;
+
 			var audioComponent = GetComponent<AudioSource>();
 			audioComponent.volume = referenceVolume;
 			audioComponent.loop = false;

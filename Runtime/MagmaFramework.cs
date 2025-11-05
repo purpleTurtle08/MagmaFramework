@@ -69,15 +69,6 @@ namespace MagmaFlow.Framework.Core
 			SetupFrameworkCore();
 		}
 
-		private void Update()
-		{
-			if (Screen.width != currentResolution.width || Screen.height != currentResolution.height)
-			{
-				Resolution newResolution = new Resolution { width = Screen.width, height = Screen.height, refreshRateRatio = currentResolution.refreshRateRatio };
-				OnScreenSizeChanged(newResolution);
-			}
-		}
-
 		/// <summary>
 		/// This event is subscribed to the Unity change scene event at game core startup
 		/// </summary>
@@ -98,18 +89,13 @@ namespace MagmaFlow.Framework.Core
 			EventBus.Publish<SceneUnloadedEvent>(new SceneUnloadedEvent(scene));
 		}
 
-		private void OnScreenSizeChanged(Resolution newResolution)
-		{	
-			currentResolution = newResolution;
-			EventBus.Publish(new SetScreenResolutionEvent(currentResolution, currentScreenMode));
-		}
-
 		/// <summary>
 		/// Initializes the game core component.
 		/// Creates a PooledObjectsManager that will persist through scene changes
 		/// </summary>
 		private void SetupFrameworkCore()
-		{
+		{	
+			//currentResolution = Screen.currentResolution;
 			var pooledObjManager = new GameObject("PooledObjectsManager");
 			PooledObjectsManager = pooledObjManager.AddComponent<PooledObjectsManager>();
 			PooledObjectsManager.transform.SetParent(transform);
@@ -125,13 +111,14 @@ namespace MagmaFlow.Framework.Core
 		{
 			if (Instance != null && Instance != this)
 			{
+				Debug.LogWarning($"Removed {gameObject.name}, as it is a duplicate MagmaFramework. Ensure you only have 1 MagmaFramework per scene.");
 				Destroy(gameObject);
 				return false;
 			}
 
 			Instance = this;
 			DontDestroyOnLoad(gameObject);
-			Debug.Log("Magma Framework core initialized");
+			Debug.Log("Magma Framework initialized.");
 			return true;
 		}
 
@@ -159,7 +146,9 @@ namespace MagmaFlow.Framework.Core
 			currentResolution = resolution;
 			currentScreenMode = mode;
 			Screen.SetResolution(resolution.width, resolution.height, mode, resolution.refreshRateRatio);
+			Debug.Log($"Screen size changed to :: {resolution.width}x{resolution.height} {resolution.refreshRateRatio.value}");
 #endif
+			EventBus.Publish(new SetScreenResolutionEvent(resolution, mode));
 		}
 
 		/// <summary>
@@ -210,7 +199,6 @@ namespace MagmaFlow.Framework.Core
 		/// Pause/unpause the game
 		/// </summary>
 		/// <param name="value">True is game pause, false is unpaused</param>
-		/// <param name="force">This will ignore any conditional return and force that pause state</param>
 		/// <param name="affectTimeScale">If set to true, this will set the time scale as well</param>
 		public void PauseGame(bool value, bool affectTimeScale = false)
 		{

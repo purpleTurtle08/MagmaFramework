@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
+using UnityEngine.Events;
 
 namespace MagmaFlow.Framework.Core
 {	
@@ -75,16 +76,6 @@ namespace MagmaFlow.Framework.Core
 		#endregion Events
 
 		#region Get subcomponents
-		/// <summary>
-		/// Returns a list of all instances of a type in all the children including grandchildren.
-		/// </summary>
-		/// <returns></returns>
-		protected T[] GetAllSubcomponents<T>() where T : Component
-		{
-			List<T> typeList = new List<T>();
-			GetChildrenInternal(transform, typeList);
-			return typeList.ToArray();
-		}
 
 		/// <summary>
 		/// Returns the instance of the given type in the child with the provided name of the provided parent
@@ -94,7 +85,7 @@ namespace MagmaFlow.Framework.Core
 		/// <param name="origin"></param>
 		/// <param name="childName"></param>
 		/// <returns></returns>
-		protected T GetSubcomponent<T>(Transform origin, string childName)
+		protected T GetSubcomponent<T>(Transform origin, string childName) where T : Component
 		{
 			foreach (Transform child in origin)
 			{
@@ -107,32 +98,16 @@ namespace MagmaFlow.Framework.Core
 			return default;
 		}
 
-		private void GetChildrenInternal<T>(Transform parent, List<T> result) where T : Component
-		{
-			if (parent != transform)
-			{
-				T comp = parent.GetComponent<T>();
-				if (comp != null)
-				{
-					result.Add(comp);
-				}
-			}
-
-			foreach (Transform child in parent)
-			{
-				GetChildrenInternal(child, result);
-			}
-		}
-
 		#endregion Get subcomponents
 
 		#region Invoke
+
 		/// <summary>
-		/// Calls the requested action with the desired delay
+		/// This is a coroutine-based wrapper and should not be confused with Unity's built-in string-based Invoke()
 		/// </summary>
 		/// <param name="task"></param>
 		/// <param name="delay"></param>
-		protected void Invoke(Action task, float delay = 0)
+		protected void Invoke(UnityAction task, float delay = 0)
 		{
 			if (task != null)
 			{
@@ -140,11 +115,12 @@ namespace MagmaFlow.Framework.Core
 			}
 			else
 			{
+				Debug.LogError($"Can't invoke a NULL action on {gameObject.name}!");
 				return;
 			}
 		}
 
-		private IEnumerator InvokeInternal(Action task, float delay)
+		private IEnumerator InvokeInternal(UnityAction task, float delay)
 		{
 			yield return new WaitForSeconds(delay);
 
@@ -164,9 +140,7 @@ namespace MagmaFlow.Framework.Core
 		protected T CreateWithComponent<T>(string name) where T : Component
 		{	
 			var temp = new GameObject(name);
-
 			var tempT = temp?.AddComponent(typeof(T));
-
 			return (T)tempT;
 		}
 
@@ -178,9 +152,7 @@ namespace MagmaFlow.Framework.Core
 		protected T CreateWithComponent<T>(string name, Transform parent) where T : Component
 		{
 			var temp = CreateWithComponent<T>(name);
-
 			temp?.transform.SetParent(parent);
-
 			return temp;
 		}
 
@@ -199,7 +171,7 @@ namespace MagmaFlow.Framework.Core
 			Transform parent,
 			Vector3 position,
 			Quaternion rotation
-		) where T : Component
+		) where T : UnityEngine.Object
 		{
 			if (assetReference == null || assetReference.RuntimeKeyIsValid() == false)
 			{
@@ -226,20 +198,24 @@ namespace MagmaFlow.Framework.Core
 					return null;
 				}
 
-				if (instantiatedObject.TryGetComponent<T>(out var component))
-				{	
-					instantiatedObject.AddComponent<InstantiatedAddressableCleanup>();
-					return component;
-				}
-				else
+				// Case 1: user asked for GameObject
+				if (typeof(T) == typeof(GameObject))
+					return instantiatedObject as T;
+
+				// Case 2: user asked for a Component
+				if (typeof(Component).IsAssignableFrom(typeof(T)) &&
+					instantiatedObject.TryGetComponent(typeof(T), out var component))
 				{
-					Debug.LogError(
-						$"The instantiated prefab '{instantiatedObject.name}' does not have the component {typeof(T)}. Cleaning up."
-					);
-	
-					Addressables.ReleaseInstance(instantiatedObject);
-					return null;
+					instantiatedObject.AddComponent<InstantiatedAddressableCleanup>();
+					return component as T;
 				}
+
+				// No matching component found
+				Debug.LogError(
+					$"Prefab '{instantiatedObject.name}' does not contain component {typeof(T)}"
+				);
+				Addressables.ReleaseInstance(instantiatedObject);
+				return null;
 			}
 			catch (Exception e)
 			{
@@ -258,30 +234,46 @@ namespace MagmaFlow.Framework.Core
 		/// <param name="position"></param>
 		/// <param name="rotation"></param>
 		/// <param name="onComplete"></param>
-		public void InstantiateAddressable<T>
-		(
+		public void InstantiateAddressable<T>(
 			AssetReference assetReference,
 			Transform parent,
 			Vector3 position,
 			Quaternion rotation,
-			Action<T> onComplete = null
-		) where T : Component
+			UnityAction<T> onComplete = null
+		) where T : UnityEngine.Object
 		{
-			try
-			{
+			// Start a coroutine to handle the async operation
+			// and its callback on the main thread.
+			StartCoroutine(InstantiateAddressableRoutine(
+				assetReference,
+				parent,
+				position,
+				rotation,
+				onComplete
+			));
+		}
 
-				_ = InstantiateAddressableAsync<T>(assetReference, parent, position, rotation).ContinueWith(task =>
-				{
-					if (task.IsCompletedSuccessfully)
-					{
-						onComplete?.Invoke(task.Result);
-					}
-				});
+		private IEnumerator InstantiateAddressableRoutine<T>(
+			AssetReference assetReference,
+			Transform parent,
+			Vector3 position,
+			Quaternion rotation,
+			UnityAction<T> onComplete
+		) where T : UnityEngine.Object
+		{
+			// Await the async task. StartCoroutine will pause here
+			// and resume on the main thread when the task is done.
+			var task = InstantiateAddressableAsync<T>(assetReference, parent, position, rotation);
+			yield return new WaitUntil(() => task.IsCompleted);
+
+			if (task.IsCompletedSuccessfully)
+			{
+				onComplete?.Invoke(task.Result);
 			}
-			catch (Exception e) 
+			else if (task.IsFaulted)
 			{
 #if UNITY_EDITOR
-				Debug.LogException(new Exception($"An error occurred during {assetReference.editorAsset.name} instantiation.", e));
+				Debug.LogException(new Exception($"An error occurred during {assetReference.editorAsset.name} instantiation.", task.Exception));
 #endif
 			}
 		}

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text;
 using TMPro;
 using UnityEngine;
@@ -65,11 +66,11 @@ namespace MagmaFlow.Framework.Utils
 
 			if (_dynamicTextMesh == null)
 			{
-				Debug.LogWarning("MagmaFpsCounter: Could not find 'DynamicText' child with TextMeshProUGUI component.", this);
+				UnityEngine.Debug.LogWarning("MagmaFpsCounter: Could not find 'DynamicText' child with TextMeshProUGUI component.", this);
 			}
 			if (_staticTextMesh == null)
 			{
-				Debug.LogWarning("MagmaFpsCounter: Could not find 'StaticText' child with TextMeshProUGUI component.", this);
+				UnityEngine.Debug.LogWarning("MagmaFpsCounter: Could not find 'StaticText' child with TextMeshProUGUI component.", this);
 			}
 		}
 
@@ -131,12 +132,13 @@ namespace MagmaFlow.Framework.Utils
 
 			return
 				$"Managed GC: {BytesToMB(managedMemory)} MB\n" +
-				$"Mono Used: {BytesToMB(monoUsed)} MB / Mono Heap: {BytesToMB(monoHeap)} MB\n" +
+				$"Mono Used: {BytesToMB(monoUsed)} MB\n" +
+				$"Mono Heap: {BytesToMB(monoHeap)} MB\n" +
 				$"Total Allocated: {BytesToMB(totalAllocated)} MB\n" +
-				$"Reserved: {BytesToMB(totalReserved)} MB (Unused: {BytesToMB(totalUnused)} MB)";
+				$"Reserved: {BytesToMB(totalReserved)} MB (Used: {BytesToMB(totalReserved) - BytesToMB(totalUnused)} MB)\n";
 		}
 
-		private static int BytesToMB(long bytes) => Mathf.CeilToInt(bytes / (1024f * 1024f));
+		private static int BytesToMB(long bytes) => Mathf.CeilToInt((float)bytes / (1024f * 1024f));
 
 #if UNITY_EDITOR
 		private void OnValidate()

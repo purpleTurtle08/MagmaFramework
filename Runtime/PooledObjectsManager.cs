@@ -27,8 +27,11 @@ namespace MagmaFlow.Framework.Core
 	public class PooledObjectsManager : MonoBehaviour
 	{
 #if UNITY_EDITOR
+		/// <summary>
+		/// Editor only method. Logs the state of the pools
+		/// </summary>
 		[ContextMenu("Log Pool State")]
-		private void LogPoolState()
+		public void LogPoolState()
 		{
 			foreach (var keyValue in pool)
 			{
@@ -46,7 +49,7 @@ namespace MagmaFlow.Framework.Core
 		/// Due to memory efficiency this should be kept fairly around 500.
 		/// No upper bound on the pool means it can grow indefinitely if unused objects accumulate.
 		/// </summary>
-		public int MaximumPoolSize { get; private set; } = 99999999;
+		public int MaximumPoolSize { get; private set; } = int.MaxValue;
 
 		/// <summary>
 		/// This dictionary contains the loaded assets 
@@ -80,8 +83,16 @@ namespace MagmaFlow.Framework.Core
 		/// This is so that our scene inspector doesn't get filled with pooled objects
 		/// </summary>
 		private Transform genericPooledObjectsParent;
+		/// <summary>
+		/// A flag that indicates if ClearObjectPools() is in progress
+		/// </summary>
+		private bool isClearing = false;
 
-		internal void RemoveLookup(IPoolableObject obj) => lookUp.Remove(obj);
+		internal void RemoveLookup(IPoolableObject obj)
+		{
+			if (isClearing) return;
+			lookUp.Remove(obj);
+		}
 
 		private void OnDestroy()
 		{
@@ -98,7 +109,7 @@ namespace MagmaFlow.Framework.Core
 		{
 			if (assetReference == null)
 			{
-				Debug.LogWarning("CreateNewInstance called with null AssetReference.");
+				Debug.LogError("CreateNewInstance() called with a NULL asset reference.");
 				return null;
 			}
 
@@ -113,7 +124,7 @@ namespace MagmaFlow.Framework.Core
 				if (cancellationToken.IsCancellationRequested)
 				{
 #if UNITY_EDITOR
-					Debug.Log($"Instantiation of {assetReference.editorAsset.name} was cancelled.");
+					Debug.LogWarning($"Instantiation of {assetReference.editorAsset.name} was cancelled.");
 #endif
 					return null;
 				}
@@ -121,7 +132,7 @@ namespace MagmaFlow.Framework.Core
 				if(loadedAsset == null)
 				{
 #if UNITY_EDITOR
-					Debug.Log($"There was an issue loading {assetReference.editorAsset.name} asset.");
+					Debug.LogWarning($"There was an issue loading {assetReference.editorAsset.name} asset.");
 #endif
 					return null;
 				}
@@ -152,10 +163,6 @@ namespace MagmaFlow.Framework.Core
 			}
 			catch (Exception e)
 			{
-				// If something goes wrong during await
-				//if (handle.IsValid() && handle.Result != null)
-				//	Addressables.ReleaseInstance(handle.Result);
-
 				Debug.LogException(e);
 				return null;
 			}
@@ -372,6 +379,8 @@ namespace MagmaFlow.Framework.Core
 		/// <param name="cancelInstantiateOperations">If set to true, all active instantiation operations will be cancelled</param>
 		public void ClearObjectPools(bool cancelPrewarmOperations = false, bool cancelInstantiateOperations = false)
 		{
+			isClearing = true;
+
 			if (cancelInstantiateOperations)
 				CancelInstantiateOperation();
 
@@ -398,7 +407,7 @@ namespace MagmaFlow.Framework.Core
 			// We MUST copy to a new List, because PooledInstanceCleanup.OnDestroy()
 			// will modify the 'lookUp' dictionary as we iterate.
 			var activeObjects = new List<IPoolableObject>(lookUp.Keys);
-			foreach (var pooledObject in activeObjects)
+			foreach (var pooledObject in lookUp.Keys)
 			{
 				if (pooledObject != null && pooledObject.MonoBehaviour != null)
 				{
@@ -417,6 +426,8 @@ namespace MagmaFlow.Framework.Core
 			}
 			loadedAssets.Clear();
 			assetNames.Clear();
+
+			isClearing = false;
 		}
 	}
 }
