@@ -7,7 +7,7 @@ using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
 
-namespace MagmaFlow.Framework.Core
+namespace MagmaFlow.Framework.Pooling
 {
 	public interface IPoolableObject
 	{
@@ -24,7 +24,7 @@ namespace MagmaFlow.Framework.Core
 	}
 
 	[DefaultExecutionOrder(-50)]
-	public class PooledObjectsManager : MonoBehaviour
+	public class MagmaFramework_PooledObjectsManager : MonoBehaviour
 	{
 #if UNITY_EDITOR
 		/// <summary>
@@ -45,6 +45,40 @@ namespace MagmaFlow.Framework.Core
 		}
 #endif
 
+		public static MagmaFramework_PooledObjectsManager Instance { get; private set; }
+		[SerializeField][Tooltip("This will be used when initializing the PooledObjectsManager.\nA value of 256 is recommended to avoid bloating up the memory with too many pooled instances.\n-1 for no limit")] private int maximumPoolSize = -1;
+
+		private void Awake()
+		{
+			if (!Singleton())
+			{
+				return;
+			}
+
+			Initialize(maximumPoolSize);
+		}
+
+		/// <summary>
+		/// This ensures that there can only be one object of this type per scene
+		/// </summary>
+		private bool Singleton()
+		{
+			var gameObjectName = gameObject.name;
+			if (Instance != null && Instance != this)
+			{
+				Debug.LogWarning($"Removed {gameObjectName}, as it is a duplicate. Ensure you only have 1 {gameObjectName} per scene.");
+				Destroy(gameObject);
+				return false;
+			}
+
+			Instance = this;
+			DontDestroyOnLoad(gameObject);
+#if UNITY_EDITOR
+			Debug.Log($"MagmaFramework::: {gameObjectName} service present.");
+#endif
+			return true;
+		}
+
 		/// <summary>
 		/// Due to memory efficiency this should be kept fairly around 500.
 		/// No upper bound on the pool means it can grow indefinitely if unused objects accumulate.
@@ -52,7 +86,8 @@ namespace MagmaFlow.Framework.Core
 		public int MaximumPoolSize { get; private set; } = int.MaxValue;
 
 		/// <summary>
-		/// This dictionary contains the loaded assets 
+		/// This dictionary contains the assets loaded into memory.
+		/// <para>Used in preventing loading the same asset twice.</para>
 		/// </summary>
 		private Dictionary<object, AsyncOperationHandle<GameObject>> loadedAssets = new();
 		/// <summary>

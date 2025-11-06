@@ -3,11 +3,11 @@ using UnityEngine;
 using UnityEngine.Events;
 using Random = UnityEngine.Random;
 
-namespace MagmaFlow.Framework.Sound
+namespace MagmaFlow.Framework.Utils
 {
 	[RequireComponent(typeof(AudioSource))]
 	[DefaultExecutionOrder(-50)]
-	public class MusicManager : MonoBehaviour
+	public class MagmaFramework_MusicManager : MonoBehaviour
 	{
 		[SerializeField]
 		[Tooltip("The duration in seconds for a track to fade out and the next track fades in during automatic playback. This is not a cross-fade")]
@@ -38,7 +38,7 @@ namespace MagmaFlow.Framework.Sound
 		/// <summary>
 		/// 
 		/// </summary>
-		public static MusicManager Instance { get; private set; }
+		public static MagmaFramework_MusicManager Instance { get; private set; }
 		/// <summary>
 		/// This uses the audio source's current volume.
 		/// If there's a case where you fade the volume to 0 and then immediately call IsMuted, it will return 'false'.
@@ -239,16 +239,19 @@ namespace MagmaFlow.Framework.Sound
 		/// </summary>
 		private bool Singleton()
 		{
-			if (Instance != null && Instance != this) 
+			var gameObjectName = gameObject.name;
+			if (Instance != null && Instance != this)
 			{
-				Debug.LogWarning($"Removed {gameObject.name}, as it is a duplicate MusicManager. Ensure you only have 1 MusicManager per scene.");
+				Debug.LogWarning($"Removed {gameObjectName}, as it is a duplicate. Ensure you only have 1 {gameObjectName} per scene.");
 				Destroy(gameObject);
 				return false;
 			}
 
 			Instance = this;
 			DontDestroyOnLoad(gameObject);
-			Debug.Log("Music Manager initialized.");
+#if UNITY_EDITOR
+			Debug.Log($"MagmaFramework::: {gameObjectName} service present.");
+#endif
 			return true;
 		}
 

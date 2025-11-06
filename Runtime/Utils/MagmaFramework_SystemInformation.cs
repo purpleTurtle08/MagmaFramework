@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text;
 using TMPro;
 using UnityEngine;
@@ -7,11 +6,6 @@ using UnityEngine.UI;
 
 namespace MagmaFlow.Framework.Utils
 {
-	/// <summary>
-	/// Utility class that outputs FPS to text. In addition it can also show system info.
-	/// It has been optimized to make as few frame allocations as possible, as well
-	/// as fastest rendering of text possible by using TextMeshPro.
-	/// </summary>
 	[SelectionBase]
 	[DisallowMultipleComponent]
 	[RequireComponent(typeof(Canvas))]
@@ -19,7 +13,12 @@ namespace MagmaFlow.Framework.Utils
 #if UNITY_EDITOR
 	[ExecuteInEditMode]
 #endif
-	public class MagmaSystemInfo : MonoBehaviour
+	/// <summary>
+	/// Utility class that outputs FPS to text. In addition it can also information about memory allocations.
+	/// It has been optimized to make as few frame allocations as possible, as well
+	/// as fastest rendering of text possible by using TextMeshPro.
+	/// </summary>
+	public class MagmaFramework_SystemInformation : MonoBehaviour
 	{
 		[Header("Formatting")]
 		[SerializeField] [Tooltip("{0} = Average FPS, {1} = Lowest FPS (from peak ms), {2} = Average milliseconds")] [TextArea(3, 10)] private string dynamicText = DEFAULT_DYNAMIC_TEXT;
@@ -59,6 +58,11 @@ namespace MagmaFlow.Framework.Utils
 		private float _highMs;
 		private float _lowestFps = float.MaxValue;
 
+		public static MagmaFramework_SystemInformation Instance { get; private set; }
+
+		/// <summary>
+		/// Binds the text mesh pro components
+		/// </summary>
 		private void Bind()
 		{
 			_dynamicTextMesh = transform.Find("DynamicText")?.GetComponent<TextMeshProUGUI>();
@@ -72,6 +76,27 @@ namespace MagmaFlow.Framework.Utils
 			{
 				UnityEngine.Debug.LogWarning("MagmaFpsCounter: Could not find 'StaticText' child with TextMeshProUGUI component.", this);
 			}
+		}
+
+		/// <summary>
+		/// This ensures that there can only be one object of this type per scene
+		/// </summary>
+		private bool Singleton()
+		{
+			var gameObjectName = gameObject.name;
+			if (Instance != null && Instance != this)
+			{
+				Debug.LogWarning($"Removed {gameObjectName}, as it is a duplicate. Ensure you only have 1 {gameObjectName} per scene.");
+				Destroy(gameObject);
+				return false;
+			}
+
+			Instance = this;
+			DontDestroyOnLoad(gameObject);
+#if UNITY_EDITOR
+			Debug.Log($"MagmaFramework::: {gameObjectName} service present.");
+#endif
+			return true;
 		}
 
 		private void Awake()
@@ -121,6 +146,7 @@ namespace MagmaFlow.Framework.Utils
 		/// <summary>
 		/// Returns a snapshot of current memory usage in bytes.
 		/// </summary>
+		/// <returns>Memory profile of the application (this is not the whole footprint that will appear in TaskManager)</returns>
 		private string GetMemoryReport()
 		{
 			long managedMemory = System.GC.GetTotalMemory(false);

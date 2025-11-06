@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 4006557309385943521}
   - component: {fileID: 4006557309385943520}
   m_Layer: 0
-  m_Name: MagmaMusicManager
+  m_Name: MagmaFramework_MusicManager
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -142,7 +142,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b0f5ab69e1a2a0641a8ed9ab25525b06, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  autoPlayCrossfadeDuration: 3
+  autoPlayFadeDuration: 3
   referenceVolume: 0.5
   StartingClipIndex: 0
   playList: []

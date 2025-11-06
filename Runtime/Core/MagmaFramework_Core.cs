@@ -41,19 +41,15 @@ namespace MagmaFlow.Framework.Core
 	/// This script is the core of the framework.
 	/// Place it in the scene on an empty object or drag & drop the MagmaFrameworkCore prefab into the scene.
 	/// </summary>
-	public class MagmaFramework : MonoBehaviour
+	public class MagmaFramework_Core : MonoBehaviour
 	{	
 		/// <summary>
 		/// Static reference to this singleton. A property of BaseBehaviour as well
 		/// </summary>
-		public static MagmaFramework Instance { get; private set; }
-		/// <summary>
-		/// This handles pooled objects
-		/// </summary>
-		public PooledObjectsManager PooledObjectsManager { get; private set; }
+		public static MagmaFramework_Core Instance { get; private set; }
+
 		public bool IsGamePaused { get; private set; } = false;
 
-		[SerializeField] [Tooltip("This will be used when initializing the PooledObjectsManager.\nA value of 256 is recommended to avoid bloating up the memory with too many pooled instances.\n-1 for no limit")] private int maximumPoolSize = -1;
 		private Resolution currentResolution;
 		private FullScreenMode currentScreenMode;
 
@@ -74,7 +70,7 @@ namespace MagmaFlow.Framework.Core
 		/// <param name="mode"></param>
 		private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
 		{
-			EventBus.Publish<SceneLoadedEvent>(new SceneLoadedEvent(scene, mode));
+			MagmaFramework_EventBus.Publish<SceneLoadedEvent>(new SceneLoadedEvent(scene, mode));
 		}
 
 		/// <summary>
@@ -84,7 +80,7 @@ namespace MagmaFlow.Framework.Core
 		/// <param name="mode"></param>
 		private void OnSceneUnloaded(Scene scene)
 		{
-			EventBus.Publish<SceneUnloadedEvent>(new SceneUnloadedEvent(scene));
+			MagmaFramework_EventBus.Publish<SceneUnloadedEvent>(new SceneUnloadedEvent(scene));
 		}
 
 		/// <summary>
@@ -93,11 +89,6 @@ namespace MagmaFlow.Framework.Core
 		/// </summary>
 		private void SetupFrameworkCore()
 		{	
-			//currentResolution = Screen.currentResolution;
-			var pooledObjManager = new GameObject("PooledObjectsManager");
-			PooledObjectsManager = pooledObjManager.AddComponent<PooledObjectsManager>();
-			PooledObjectsManager.transform.SetParent(transform);
-			PooledObjectsManager.Initialize(maximumPoolSize);
 			UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoaded;
 			UnityEngine.SceneManagement.SceneManager.sceneUnloaded += OnSceneUnloaded;
 		}
@@ -107,16 +98,19 @@ namespace MagmaFlow.Framework.Core
 		/// </summary>
 		private bool Singleton()
 		{
+			var gameObjectName = gameObject.name;
 			if (Instance != null && Instance != this)
 			{
-				Debug.LogWarning($"Removed {gameObject.name}, as it is a duplicate MagmaFramework. Ensure you only have 1 MagmaFramework per scene.");
+				Debug.LogWarning($"Removed {gameObjectName}, as it is a duplicate. Ensure you only have 1 {gameObjectName} per scene.");
 				Destroy(gameObject);
 				return false;
 			}
 
 			Instance = this;
 			DontDestroyOnLoad(gameObject);
-			Debug.Log("Magma Framework initialized.");
+#if UNITY_EDITOR
+			Debug.Log($"MagmaFramework::: {gameObjectName} service present.");
+#endif
 			return true;
 		}
 
@@ -146,7 +140,7 @@ namespace MagmaFlow.Framework.Core
 			Screen.SetResolution(resolution.width, resolution.height, mode, resolution.refreshRateRatio);
 			Debug.Log($"Screen size changed to :: {resolution.width}x{resolution.height} {resolution.refreshRateRatio.value}");
 #endif
-			EventBus.Publish(new SetScreenResolutionEvent(resolution, mode));
+			MagmaFramework_EventBus.Publish(new SetScreenResolutionEvent(resolution, mode));
 		}
 
 		/// <summary>
@@ -202,7 +196,7 @@ namespace MagmaFlow.Framework.Core
 		{
 			if (affectTimeScale) Time.timeScale = value ? 0 : 1;
 			IsGamePaused = value;
-			EventBus.Publish(new GamePausedEvent(IsGamePaused));
+			MagmaFramework_EventBus.Publish(new GamePausedEvent(IsGamePaused));
 		}
 	}
 }

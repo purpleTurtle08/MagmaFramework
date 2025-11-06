@@ -1,4 +1,6 @@
 ﻿using MagmaFlow.Framework.Events;
+using MagmaFlow.Framework.Pooling;
+using MagmaFlow.Framework.Utils;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -13,8 +15,15 @@ namespace MagmaFlow.Framework.Core
 	/// This should replace Unity's MonoBehaviour for an array of extended functionality provided by the MagmaFlow Framework
 	/// </summary>
 	public class BaseBehaviour : MonoBehaviour
-	{	
-		protected MagmaFramework MagmaFramework => MagmaFramework.Instance;
+	{
+		protected MagmaFramework_Core MagmaFramework_Core => MagmaFramework_Core.Instance;
+		protected MagmaFramework_PooledObjectsManager MagmaFramework_PooledObjectsManager => MagmaFramework_PooledObjectsManager.Instance;
+		protected MagmaFramework_MusicManager MagmaFramework_MusicManager => MagmaFramework_MusicManager.Instance;
+
+		private void Awake()
+		{
+			
+		}
 
 		/// <summary>
 		/// Using ComputePenetration(), returns a list of all the contact points around a sphere collider of radius 'radius' for this object's collider
@@ -57,21 +66,21 @@ namespace MagmaFlow.Framework.Core
 		protected virtual void OnSceneUnloaded(SceneUnloadedEvent eventData) { }
 		protected virtual void OnDestroy()
 		{
-			EventBus.Unsubscribe<GamePausedEvent>(OnGamePaused);
-			EventBus.Unsubscribe<SceneLoadedEvent>(OnSceneLoaded);
-			EventBus.Unsubscribe<SceneUnloadedEvent>(OnSceneUnloaded);
+			MagmaFramework_EventBus.Unsubscribe<GamePausedEvent>(OnGamePaused);
+			MagmaFramework_EventBus.Unsubscribe<SceneLoadedEvent>(OnSceneLoaded);
+			MagmaFramework_EventBus.Unsubscribe<SceneUnloadedEvent>(OnSceneUnloaded);
 		}
 		protected virtual void OnEnable()
 		{
-			EventBus.Subscribe<GamePausedEvent>(OnGamePaused);
-			EventBus.Subscribe<SceneLoadedEvent>(OnSceneLoaded);
-			EventBus.Subscribe<SceneUnloadedEvent>(OnSceneUnloaded);
+			MagmaFramework_EventBus.Subscribe<GamePausedEvent>(OnGamePaused);
+			MagmaFramework_EventBus.Subscribe<SceneLoadedEvent>(OnSceneLoaded);
+			MagmaFramework_EventBus.Subscribe<SceneUnloadedEvent>(OnSceneUnloaded);
 		}
 		protected virtual void OnDisable()
 		{
-			EventBus.Unsubscribe<GamePausedEvent>(OnGamePaused);
-			EventBus.Unsubscribe<SceneLoadedEvent>(OnSceneLoaded);
-			EventBus.Unsubscribe<SceneUnloadedEvent>(OnSceneUnloaded);
+			MagmaFramework_EventBus.Unsubscribe<GamePausedEvent>(OnGamePaused);
+			MagmaFramework_EventBus.Unsubscribe<SceneLoadedEvent>(OnSceneLoaded);
+			MagmaFramework_EventBus.Unsubscribe<SceneUnloadedEvent>(OnSceneUnloaded);
 		}
 		#endregion Events
 

@@ -9,7 +9,7 @@ namespace MagmaFlow.Framework.Events
 	/// <para>The EventBus will handle cleaning 'dead' subscribers that are instanced as MonoBehaviour only.</para>
 	/// <para>For non-MonoBehaviours, please make sure that you handle unsubscribing properly to avoid memory leaks.</para>
 	/// </summary>
-	public static class EventBus
+	public static class MagmaFramework_EventBus
 	{
 		/// <summary>
 		/// Internal class to hold a reference to the delegate (the callback) and the subscribing entity.
