@@ -5,8 +5,7 @@ using UnityEngine;
 namespace MagmaFlow.Framework.Events
 {
 	/// <summary>
-	/// As a GOLDEN RULE, each object should manage its subscribe / unsubscribe to events. This can be generally made through 
-	/// the OnEnable() / OnDisable methods.
+	/// As a GOLDEN RULE, each object should manage its subscribe / unsubscribe to events. This can be generally made through the OnEnable() / OnDisable methods.
 	/// <para>The EventBus will handle cleaning 'dead' subscribers that are instanced as MonoBehaviour only.</para>
 	/// <para>For non-MonoBehaviours, please make sure that you handle unsubscribing properly to avoid memory leaks.</para>
 	/// </summary>

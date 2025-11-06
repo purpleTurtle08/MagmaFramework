@@ -11,13 +11,14 @@ namespace MagmaFlow.Framework.Utils
 	public static partial class MagmaUtils
 	{
 		private static readonly Encoding DefaultEncoding = new UTF8Encoding(false);
-
-		/// <summary>
-		/// Returns the time(in seconds) formatted. Checks if hours <= 0
-		/// <para>hh"h":mm"m":ss"s" if addLetters set TRUE</para>
-		/// <para>hh:mm:ss if addLetters set FALSE</para>
+		
+		///<summary>
+		/// Returns the time (in seconds) formatted.
+		/// <para>Format if addLetters set TRUE = xx'H':xx'M':xx's'</para>
+		/// <para>Format if addLetters set FALSE = xx:xx:xx</para>
 		/// </summary>
 		/// <param name="time"></param>
+		/// <param name="addLetters"></param>
 		/// <returns></returns>
 		public static string GetTimeFormatted(int time, bool addLetters = false)
 		{

@@ -36,13 +36,11 @@ namespace MagmaFlow.Framework.Core
 		EveryFourthVBlank = 4
 	}
 
+	[DefaultExecutionOrder(-200)]
 	/// <summary>
 	/// This script is the core of the framework.
 	/// Place it in the scene on an empty object or drag & drop the MagmaFrameworkCore prefab into the scene.
-	/// 
-	/// RECOMMENDED: Create your own game core script and inherit the MagmaFramework core behaviour or simply make a separate singleton
 	/// </summary>
-	[DefaultExecutionOrder(-200)]
 	public class MagmaFramework : MonoBehaviour
 	{	
 		/// <summary>
@@ -91,7 +89,7 @@ namespace MagmaFlow.Framework.Core
 
 		/// <summary>
 		/// Initializes the game core component.
-		/// Creates a PooledObjectsManager that will persist through scene changes
+		/// <para>Creates a pooledObjectsManager that will persist through scene changes.</para>
 		/// </summary>
 		private void SetupFrameworkCore()
 		{	
@@ -172,7 +170,7 @@ namespace MagmaFlow.Framework.Core
 		}
 
 		/// <summary>
-		/// Exits the application. Treats editor as well
+		/// Exits the application. Treats editor as well.
 		/// </summary>
 		public void Quit()
 		{
@@ -186,7 +184,7 @@ namespace MagmaFlow.Framework.Core
 		}
 
 		/// <summary>
-		/// Modify the global time scale
+		/// Modify the global time scale.
 		/// </summary>
 		/// <param name="value"></param>
 		public void SetTimeScale(float value)
@@ -195,8 +193,8 @@ namespace MagmaFlow.Framework.Core
 		}
 
 		/// <summary>
-		/// !!WARNING!! If you affect time scale, you might want to make sure that your Animator / Other components run on unscaledDeltaTime (where it is the case)
-		/// Pause/unpause the game
+		/// !!WARNING!! If you affect time scale, you might want to make sure that your Animator / Other components run on unscaledDeltaTime (where it is the case).
+		/// Pause/unpause the game.
 		/// </summary>
 		/// <param name="value">True is game pause, false is unpaused</param>
 		/// <param name="affectTimeScale">If set to true, this will set the time scale as well</param>

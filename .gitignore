@@ -4,6 +4,7 @@
 Runtime/.vs/*
 Runtime/bin/*
 Runtime/obj/*
+_docBuilder/*
 /build.windows/
 /build.android/
 

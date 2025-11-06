@@ -2,11 +2,11 @@ using UnityEngine;
 using UnityEngine.AddressableAssets;
 
 namespace MagmaFlow.Framework.Core
-{	
+{
 	/// <summary>
-	/// This component is added whenever an object is instantiated via BaseBehaviour.InstantiateAddressable<>()
+	/// This component is added whenever an object is instantiated via baseBehaviour.InstantiateAddressable()
 	/// </summary>
-    public class InstantiatedAddressableCleanup : MonoBehaviour
+	public class InstantiatedAddressableCleanup : MonoBehaviour
     {
 		private void OnDestroy()
 		{
