@@ -18,7 +18,7 @@ namespace MagmaFlow.Framework.Utils
 	/// It has been optimized to make as few frame allocations as possible, as well
 	/// as fastest rendering of text possible by using TextMeshPro.
 	/// </summary>
-	public class MagmaFramework_SystemInformation : MonoBehaviour
+	internal sealed class MagmaFramework_SystemInformation : MonoBehaviour
 	{
 		[Header("Formatting")]
 		[SerializeField] [Tooltip("{0} = Average FPS, {1} = Lowest FPS (from peak ms), {2} = Average milliseconds")] [TextArea(3, 10)] private string dynamicText = DEFAULT_DYNAMIC_TEXT;
@@ -101,6 +101,9 @@ namespace MagmaFlow.Framework.Utils
 
 		private void Awake()
 		{
+			if (!Singleton())
+				return;
+
 			Bind();
 
 			// Try to use whatever is set on the text itself.

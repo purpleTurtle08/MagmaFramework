@@ -32,6 +32,8 @@ namespace MagmaFlow.Framework.Utils
 		/// Destroys all children of this transform.
 		/// Works in both Play Mode (Destroy) and Edit Mode (DestroyImmediate).
 		/// </summary>
+		/// <param name="transform"></param>
+		/// <param name="immediate"></param>
 		public static void ClearChildren(this Transform transform, bool immediate = false)
 		{
 			for (int i = transform.childCount - 1; i >= 0; i--)
@@ -72,7 +74,7 @@ namespace MagmaFlow.Framework.Utils
 		/// <summary>
 		/// This only works for a layer mask that contains a single layer
 		/// </summary>
-		/// <param name="mask">This mask must only contain a single layer!</param>
+		/// <param name="mask">This mask MUST only contain a single layer!</param>
 		/// <returns></returns>
 		public static int LayerMaskToLayer(this LayerMask mask)
 		{

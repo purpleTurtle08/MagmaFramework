@@ -6,8 +6,8 @@ using Random = UnityEngine.Random;
 namespace MagmaFlow.Framework.Utils
 {
 	[RequireComponent(typeof(AudioSource))]
-	[DefaultExecutionOrder(-50)]
-	public class MagmaFramework_MusicManager : MonoBehaviour
+	[DefaultExecutionOrder(-100)]
+	public sealed class MagmaFramework_MusicManager : MonoBehaviour
 	{
 		[SerializeField]
 		[Tooltip("The duration in seconds for a track to fade out and the next track fades in during automatic playback. This is not a cross-fade")]

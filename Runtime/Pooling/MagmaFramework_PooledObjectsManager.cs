@@ -23,8 +23,12 @@ namespace MagmaFlow.Framework.Pooling
 		public void OnRelease();
 	}
 
-	[DefaultExecutionOrder(-50)]
-	public class MagmaFramework_PooledObjectsManager : MonoBehaviour
+	/// <summary>
+	/// A singleton managing pooled object creation.
+	/// <para>Can log the pool state via a context menu 'Log Pool State'</para>
+	/// </summary>
+	[DefaultExecutionOrder(-100)]
+	public sealed class MagmaFramework_PooledObjectsManager : MonoBehaviour
 	{
 #if UNITY_EDITOR
 		/// <summary>
@@ -127,6 +131,18 @@ namespace MagmaFlow.Framework.Pooling
 		{
 			if (isClearing) return;
 			lookUp.Remove(obj);
+		}
+
+		/// <summary>
+		/// Due to memory constraints you can set a maximum pool size, or leave it -1
+		/// </summary>
+		/// <param name="maximumPoolSize"></param>
+		private void Initialize(int maximumPoolSize = -1)
+		{
+			MaximumPoolSize = maximumPoolSize >= 0 ? maximumPoolSize : 9999999;
+			var poolRoot = new GameObject("Pooled Objects Container");
+			poolRoot.transform.SetParent(transform);
+			genericPooledObjectsParent = poolRoot.transform;
 		}
 
 		private void OnDestroy()
@@ -246,18 +262,6 @@ namespace MagmaFlow.Framework.Pooling
 			{
 				cts.Cancel();
 			}
-		}
-
-		/// <summary>
-		/// Due to memory constraints you can set a maximum pool size, or leave it -1
-		/// </summary>
-		/// <param name="maximumPoolSize"></param>
-		public void Initialize(int maximumPoolSize = -1)
-		{
-			MaximumPoolSize = maximumPoolSize >= 0 ? maximumPoolSize : 9999999;
-			var poolRoot = new GameObject("Pooled Objects Container");
-			poolRoot.transform.SetParent(transform);
-			genericPooledObjectsParent = poolRoot.transform;
 		}
 
 		/// <summary>

@@ -1,12 +1,12 @@
 using UnityEngine;
 
 namespace MagmaFlow.Framework.Pooling
-{	
+{
 	/// <summary>
 	/// Managed by MagmaFramework_PooledObjectsManager.
 	/// This will clean-up the reference in the manager, in case that the object is destroyed.
 	/// </summary>
-	public class PooledInstanceCleanup : MonoBehaviour
+	internal sealed class PooledInstanceCleanup : MonoBehaviour
 	{
 		private MagmaFramework_PooledObjectsManager manager;
 		private IPoolableObject pooledObject;

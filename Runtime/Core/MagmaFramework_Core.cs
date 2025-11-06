@@ -41,7 +41,7 @@ namespace MagmaFlow.Framework.Core
 	/// This script is the core of the framework.
 	/// Place it in the scene on an empty object or drag & drop the MagmaFrameworkCore prefab into the scene.
 	/// </summary>
-	public class MagmaFramework_Core : MonoBehaviour
+	public sealed class MagmaFramework_Core : MonoBehaviour
 	{	
 		/// <summary>
 		/// Static reference to this singleton. A property of BaseBehaviour as well

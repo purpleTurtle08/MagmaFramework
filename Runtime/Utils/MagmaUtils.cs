@@ -10,7 +10,7 @@ namespace MagmaFlow.Framework.Utils
 {
 	public static partial class MagmaUtils
 	{
-		private static readonly Encoding DefaultEncoding = new UTF8Encoding(false);
+		private static readonly Encoding DEFAULT_ENCODING = new UTF8Encoding(false);
 		
 		///<summary>
 		/// Returns the time (in seconds) formatted.
@@ -112,7 +112,7 @@ namespace MagmaFlow.Framework.Utils
 
 			try
 			{
-				var result = await File.ReadAllTextAsync(filePath, DefaultEncoding);
+				var result = await File.ReadAllTextAsync(filePath, DEFAULT_ENCODING);
 				return result;
 			}
 			catch (Exception ex)

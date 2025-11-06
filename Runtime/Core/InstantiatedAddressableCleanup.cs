@@ -6,7 +6,7 @@ namespace MagmaFlow.Framework.Core
 	/// <summary>
 	/// This component is added whenever an object is instantiated via baseBehaviour.InstantiateAddressable()
 	/// </summary>
-	public class InstantiatedAddressableCleanup : MonoBehaviour
+	internal sealed class InstantiatedAddressableCleanup : MonoBehaviour
     {
 		private void OnDestroy()
 		{
