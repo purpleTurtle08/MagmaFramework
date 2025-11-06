@@ -101,7 +101,7 @@ namespace MagmaFlow.Framework.Utils
 
 		private void Awake()
 		{
-			if (!Singleton())
+			if (Application.isPlaying && !Singleton())
 				return;
 
 			Bind();

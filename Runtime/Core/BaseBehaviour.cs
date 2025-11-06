@@ -20,11 +20,6 @@ namespace MagmaFlow.Framework.Core
 		protected MagmaFramework_PooledObjectsManager MagmaFramework_PooledObjectsManager => MagmaFramework_PooledObjectsManager.Instance;
 		protected MagmaFramework_MusicManager MagmaFramework_MusicManager => MagmaFramework_MusicManager.Instance;
 
-		private void Awake()
-		{
-			
-		}
-
 		/// <summary>
 		/// Using ComputePenetration(), returns a list of all the contact points around a sphere collider of radius 'radius' for this object's collider
 		/// </summary>

@@ -50,9 +50,6 @@ namespace MagmaFlow.Framework.Core
 
 		public bool IsGamePaused { get; private set; } = false;
 
-		private Resolution currentResolution;
-		private FullScreenMode currentScreenMode;
-
 		private void Awake()
 		{
 			if (!Singleton())
