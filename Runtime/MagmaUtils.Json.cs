@@ -15,7 +15,7 @@ namespace MagmaFlow.Framework.Utils
 	public static partial class MagmaUtils
 	{
 		/// <summary>
-		/// [REQUIRES NEWTONSOFT.JSON]
+		/// <para>[REQUIRES NEWTONSOFT.JSON]</para>
 		/// Serializes an object to a compressed UTF-8 JSON byte array.
 		/// </summary>
 		public static byte[] ObjectToByteArray(System.Object obj)
@@ -44,7 +44,7 @@ namespace MagmaFlow.Framework.Utils
 		}
 
 		/// <summary>
-		/// [REQUIRES NEWTONSOFT.JSON]
+		/// <para>[REQUIRES NEWTONSOFT.JSON]</para>
 		/// Decompresses and deserializes an object from a compressed UTF-8 JSON byte array.
 		/// </summary>
 		public static T ByteArrayToObject<T>(byte[] data) where T : class

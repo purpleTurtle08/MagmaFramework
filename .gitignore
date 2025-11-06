@@ -1,7 +1,9 @@
 # =============== #
 # Unity generated #
 # =============== # 
-_Framework_UnityProject/*
+Runtime/.vs/*
+Runtime/bin/*
+Runtime/obj/*
 /build.windows/
 /build.android/
 
