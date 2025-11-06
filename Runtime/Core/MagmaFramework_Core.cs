@@ -36,7 +36,7 @@ namespace MagmaFlow.Framework.Core
 		EveryFourthVBlank = 4
 	}
 
-	[DefaultExecutionOrder(-200)]
+	[DefaultExecutionOrder(-500)]
 	/// <summary>
 	/// This script is the core of the framework.
 	/// Place it in the scene on an empty object or drag & drop the MagmaFrameworkCore prefab into the scene.
@@ -95,10 +95,9 @@ namespace MagmaFlow.Framework.Core
 		/// </summary>
 		private bool Singleton()
 		{
-			var gameObjectName = gameObject.name;
 			if (Instance != null && Instance != this)
 			{
-				Debug.LogWarning($"Removed {gameObjectName}, as it is a duplicate. Ensure you only have 1 {gameObjectName} per scene.");
+				Debug.LogWarning($"Removed {name}, as it is a duplicate. Ensure you only have 1 {name} per scene.");
 				Destroy(gameObject);
 				return false;
 			}
@@ -106,7 +105,7 @@ namespace MagmaFlow.Framework.Core
 			Instance = this;
 			DontDestroyOnLoad(gameObject);
 #if UNITY_EDITOR
-			Debug.Log($"MagmaFramework::: {gameObjectName} service present.");
+			Debug.Log($"\u23E9 {name} service registered.");
 #endif
 			return true;
 		}

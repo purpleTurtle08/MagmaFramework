@@ -83,10 +83,9 @@ namespace MagmaFlow.Framework.Utils
 		/// </summary>
 		private bool Singleton()
 		{
-			var gameObjectName = gameObject.name;
 			if (Instance != null && Instance != this)
 			{
-				Debug.LogWarning($"Removed {gameObjectName}, as it is a duplicate. Ensure you only have 1 {gameObjectName} per scene.");
+				Debug.LogWarning($"Removed {name}, as it is a duplicate. Ensure you only have 1 {name} per scene.");
 				Destroy(gameObject);
 				return false;
 			}
@@ -94,7 +93,7 @@ namespace MagmaFlow.Framework.Utils
 			Instance = this;
 			DontDestroyOnLoad(gameObject);
 #if UNITY_EDITOR
-			Debug.Log($"MagmaFramework::: {gameObjectName} service present.");
+			Debug.Log($"\u23E9 {name} service registered.");
 #endif
 			return true;
 		}
