@@ -1,10 +1,12 @@
-﻿using System;
+﻿using MagmaFlow.Framework.Events;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
+using UnityEngine.Pool;
 using UnityEngine.ResourceManagement.AsyncOperations;
 
 namespace MagmaFlow.Framework.Pooling
@@ -51,6 +53,8 @@ namespace MagmaFlow.Framework.Pooling
 
 		public static MagmaFramework_PooledObjectsManager Instance { get; private set; }
 		[SerializeField][Tooltip("This will be used when initializing the PooledObjectsManager.\nA value of 256 is recommended to avoid bloating up the memory with too many pooled instances.\n-1 for no limit")] private int maximumPoolSize = -1;
+		[SerializeField][Tooltip("Keeps all the active pooled instances alive (if they are alive) upon scene changing.\nRECOMMENDED VALUE:: FALSE")] private bool keepInstancesAlive = false;
+		[SerializeField][Tooltip("Clears all the pooled objects.\nIf you never use the same assets in different scenes, you might want to consider disabling this.")] private bool keepPools = true;
 
 		private void Awake()
 		{
@@ -67,10 +71,9 @@ namespace MagmaFlow.Framework.Pooling
 		/// </summary>
 		private bool Singleton()
 		{
-			var gameObjectName = gameObject.name;
 			if (Instance != null && Instance != this)
 			{
-				Debug.LogWarning($"Removed {gameObjectName}, as it is a duplicate. Ensure you only have 1 {gameObjectName} per scene.");
+				Debug.LogWarning($"Removed {name}, as it is a duplicate. Ensure you only have 1 {name} per scene.");
 				Destroy(gameObject);
 				return false;
 			}
@@ -78,7 +81,7 @@ namespace MagmaFlow.Framework.Pooling
 			Instance = this;
 			DontDestroyOnLoad(gameObject);
 #if UNITY_EDITOR
-			Debug.Log($"MagmaFramework::: {gameObjectName} service present.");
+			Debug.Log($"\u23E9 {name} service registered.");
 #endif
 			return true;
 		}
@@ -143,11 +146,44 @@ namespace MagmaFlow.Framework.Pooling
 			var poolRoot = new GameObject("Pooled Objects Container");
 			poolRoot.transform.SetParent(transform);
 			genericPooledObjectsParent = poolRoot.transform;
+			MagmaFramework_EventBus.Subscribe<SceneUnloadedEvent>(OnSceneUnload);
 		}
 
 		private void OnDestroy()
 		{
-			ClearObjectPools(true, true);
+			MagmaFramework_EventBus.Unsubscribe<SceneUnloadedEvent>(OnSceneUnload);
+			CancelAllPrewarmOperations();
+			CancelAllInstantiateOperation();
+			ClearObjectPools(true);
+		}
+
+		private void OnSceneUnload(SceneUnloadedEvent eventData)
+		{
+			CancelAllPrewarmOperations();
+			CancelAllInstantiateOperation();
+
+			if(!keepPools)
+				ClearObjectPools(true);
+
+			if(!keepInstancesAlive)
+				ReleaseAllObjects();
+		}
+
+		/// <summary>
+		/// Internal logic for releasing the pooled instance
+		/// </summary>
+		/// <param name="pooledObject"></param>
+		private void ReleaseInstanceInternal(IPoolableObject pooledObject)
+		{
+			if (pooledObject == null) return;
+			pooledObject.OnRelease();
+			pooledObject.MonoBehaviour.gameObject.SetActive(false);
+			pooledObject.MonoBehaviour.transform.SetParent(genericPooledObjectsParent);
+			var assetReference = lookUp[pooledObject];
+			if (pool[assetReference].Count >= MaximumPoolSize)
+				Destroy(pooledObject.MonoBehaviour.gameObject);
+			else
+				pool[assetReference].Enqueue(pooledObject);
 		}
 
 		/// <summary>
@@ -193,9 +229,11 @@ namespace MagmaFlow.Framework.Pooling
 				// Verify it implements IPoolableObject
 				if (!instance.TryGetComponent<IPoolableObject>(out var pooledObject))
 				{
+#if UNITY_EDITOR
 					Debug.LogError(
 						$"The prefab '{instance.name}' does not implement IPoolableObject. Cleaning up."
 					);
+#endif
 					Destroy(instance);
 
 					return null;
@@ -210,11 +248,14 @@ namespace MagmaFlow.Framework.Pooling
 				{
 					assetNames[assetKey] = instance.name;
 				}
+
 				return pooledObject;
 			}
 			catch (Exception e)
 			{
+#if UNITY_EDITOR
 				Debug.LogException(e);
+#endif
 				return null;
 			}
 		}
@@ -244,48 +285,77 @@ namespace MagmaFlow.Framework.Pooling
 
 		/// <summary>
 		/// Stops all the prewarm operations
+		/// Cancelling is handled in poolingObjectsManager.OnDestroy() as well.
 		/// </summary>
-		public void CancelPrewarmOperations()
+		public void CancelAllPrewarmOperations()
 		{
 			foreach (var cts in prewarmTokens.Values)
 			{
-				cts.Cancel();
+				cts?.Cancel();
 			}
+		}
+
+		/// <summary>
+		/// Cancel a specific prewarm operation.
+		/// Cancelling is handled in poolingObjectsManager.OnDestroy() as well.
+		/// </summary>
+		/// <param name="forAsset">The asset refference used to start the prewarm</param>
+		public void CancelPrewarmOperation(AssetReference forAsset)
+		{
+			if(!prewarmTokens.TryGetValue(forAsset.RuntimeKey, out var cancellationTokenSource))
+			{
+#if UNITY_EDITOR
+				Debug.LogWarning($"No token present for prewarming {forAsset.editorAsset.name}");
+#endif
+				return;
+			}
+
+			cancellationTokenSource?.Cancel();
 		}
 
 		/// <summary>
 		/// Stops all instantiating operations
 		/// </summary>
-		public void CancelInstantiateOperation()
+		public void CancelAllInstantiateOperation()
 		{
 			foreach (var cts in activeInstantiations)
 			{
-				cts.Cancel();
+				cts?.Cancel();
 			}
 		}
 
 		/// <summary>
-		/// Prewarm the pool with a number of instances
+		/// Pre-warm the pool to a number of instances.
+		/// This does not 'add' or 'remove' items to/from the pool, it simply populates a pool to the desired size.
+		/// <para>Example; calling Prewarm(assetRef, 100) 2 times will not result in having a pool of 200 objects. The second call is redundant.</para>
 		/// </summary>
 		/// <param name="assetReference"></param>
-		/// <param name="count"></param>
-		public async Task Prewarm(AssetReference assetReference, int count)
+		/// <param name="count">If this is higher than the current pool count, the pool will increase in size to match the new count. If it is smaller, then nothing happens.</param>
+		public async Task PrewarmPool(AssetReference assetReference, int count)
 		{
 			var key = assetReference.RuntimeKey;
 			if (!currentlyPrewarming.Add(key))
 				return;
+			if (!pool.TryGetValue(key, out var currentPool))
+			{
+				currentPool = new Queue<IPoolableObject>();
+				pool[key] = currentPool;
+			}
+			if (currentPool.Count >= count)
+			{
+				return;
+			}
+			int difference = count - currentPool.Count;
 
 			CancellationTokenSource cts = new CancellationTokenSource();
 			prewarmTokens[key] = cts;
 
 			try
 			{
-				if (!pool.ContainsKey(key))
-					pool[key] = new Queue<IPoolableObject>();
 #if UNITY_EDITOR
-				Debug.Log($"Prewarming {count} {assetReference.editorAsset.name}...");
+				Debug.Log($"Prewarming {difference} {assetReference.editorAsset.name}...");
 #endif
-				for (int i = 0; i < count; i++)
+				for (int i = 0; i < difference; i++)
 				{
 					if (cts.Token.IsCancellationRequested)
 						break;
@@ -328,7 +398,9 @@ namespace MagmaFlow.Framework.Pooling
 		{
 			if (assetReference == null)
 			{
+#if UNITY_EDITOR
 				Debug.LogError("The asset reference that you want to instantiate is null.");
+#endif
 				return null;
 			}
 
@@ -351,7 +423,9 @@ namespace MagmaFlow.Framework.Pooling
 				}
 				catch(Exception e)
 				{
+#if UNITY_EDITOR
 					Debug.LogException(e);
+#endif
 				}
 				finally
 				{
@@ -366,15 +440,13 @@ namespace MagmaFlow.Framework.Pooling
 			var objTransform = pooledObject.MonoBehaviour.transform;
 			objTransform.SetParent(parent ?? genericPooledObjectsParent);
 
-			if (!useWorldSpace)
-			{
-				objTransform.localPosition = position;
-				objTransform.localRotation = rotation;
+			if (!useWorldSpace && parent != null)
+			{	
+				objTransform.SetLocalPositionAndRotation(position, rotation);
 			}
 			else
-			{
-				objTransform.position = position;
-				objTransform.rotation = rotation;
+			{	
+				objTransform.SetPositionAndRotation(position, rotation);
 			}
 
 			objTransform.gameObject.SetActive(true);
@@ -384,47 +456,40 @@ namespace MagmaFlow.Framework.Pooling
 		}
 
 		/// <summary>
-		/// Disables the game object.
+		/// Releases the active pooled object instances, returning them to the pool and disabling the gameObject.
+		/// </summary>
+		public void ReleaseAllObjects()
+		{
+			foreach(var activeInstance in lookUp.Keys)
+			{	
+				if(activeInstance.IsActive)
+					ReleaseInstanceInternal(activeInstance);
+			}
+		}
+
+		/// <summary>
 		/// Releases the object back into the pool.
 		/// </summary>
 		/// <param name="pooledObject"></param>
 		public void ReleaseObject(IPoolableObject pooledObject)
 		{
-			if (pooledObject == null) return;
-
 			if(!lookUp.ContainsKey(pooledObject))
 			{
 				Debug.LogError($"The object {pooledObject.MonoBehaviour.name}, that you want to release is not pooled.");
 				return;
 			}
 
-			pooledObject.OnRelease();
-			pooledObject.MonoBehaviour.gameObject.SetActive(false);
-			pooledObject.MonoBehaviour.transform.SetParent(genericPooledObjectsParent);
-
-			var assetReference = lookUp[pooledObject];
-
-			if (pool[assetReference].Count >= MaximumPoolSize)
-				Destroy(pooledObject.MonoBehaviour.gameObject);
-			else
-				pool[assetReference].Enqueue(pooledObject);
+			ReleaseInstanceInternal(pooledObject);
 		}
 
 		/// <summary>
-		/// Destroys ALL objects managed by this pool (both active and inactive),
-		/// Cancels all operations, and releases all loaded Addressable assets.
+		/// Destroys ALL objects managed by this pool (both active and inactive).
+		/// Can release all loaded Addressable assets.
 		/// </summary>
-		/// <param name="cancelPrewarmOperations">If this is set to true, the active prewarm operations will be cancelled</param>
-		/// <param name="cancelInstantiateOperations">If set to true, all active instantiation operations will be cancelled</param>
-		public void ClearObjectPools(bool cancelPrewarmOperations = false, bool cancelInstantiateOperations = false)
+		/// <param name="releaseAllLoadedAssets">If TRUE: Releases all loaded Addressable assets</param>
+		public void ClearObjectPools(bool releaseAllLoadedAssets = false)
 		{
 			isClearing = true;
-
-			if (cancelInstantiateOperations)
-				CancelInstantiateOperation();
-
-			if (cancelPrewarmOperations)
-				CancelPrewarmOperations();
 
 			// 1. Destroy all INACTIVE objects (in the queues)
 			foreach (var queue in pool.Values)
@@ -458,13 +523,16 @@ namespace MagmaFlow.Framework.Pooling
 			// We clear it just in case of any stragglers.
 			lookUp.Clear();
 
-			// 3. Now that all GameObjects are destroyed, release the assets.
-			foreach (var entry in loadedAssets.Values)
+			if (releaseAllLoadedAssets)
 			{
-				Addressables.Release(entry);
+				// 3. Now that all GameObjects are destroyed, release the assets.
+				foreach (var entry in loadedAssets.Values)
+				{
+					Addressables.Release(entry);
+				}
+				loadedAssets.Clear();
+				assetNames.Clear();
 			}
-			loadedAssets.Clear();
-			assetNames.Clear();
 
 			isClearing = false;
 		}
