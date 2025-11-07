@@ -6,7 +6,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
-using UnityEngine.Pool;
 using UnityEngine.ResourceManagement.AsyncOperations;
 
 namespace MagmaFlow.Framework.Pooling
