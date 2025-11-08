@@ -7,7 +7,6 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
-using UnityEngine.Events;
 
 namespace MagmaFlow.Framework.Core
 {	
@@ -21,38 +20,46 @@ namespace MagmaFlow.Framework.Core
 		protected MagmaFramework_MusicManager MagmaFramework_MusicManager => MagmaFramework_MusicManager.Instance;
 
 		/// <summary>
-		/// Using ComputePenetration(), returns a list of all the contact points around a sphere collider of radius 'radius' for this object's collider
+		/// Finds all colliders that are within the overlap sphere of this sourcePoint.
 		/// </summary>
-		/// <param name="sourcePoint"></param>
-		/// <param name="radius"></param>
-		/// <param name="collisionLayerMask"></param>
-		/// <returns></returns>
-		protected List<Vector3> GetOverlapContactPoints(Vector3 sourcePoint, float radius, LayerMask collisionLayerMask)
-		{	
-			if(!TryGetComponent<Collider>(out var thisCollider))
+		/// <param name="results">A pre-allocated array to store overlap results (prevents garbage).</param>
+		/// <param name="sourcePoint">The center of the overlap sphere.</param>
+		/// <param name="radius">The radius of the overlap sphere.</param>
+		/// <param name="collisionLayerMask">The layers to check against.</param>
+		/// <param name="ignoreTriggers">How to handle trigger colliders.</param>
+		/// <returns>Returns a list of approximate contact points on those colliders.</returns>
+		protected List<Vector3> GetOverlapContactPoints(ref Collider[] results, Vector3 sourcePoint, float radius, LayerMask? collisionLayerMask = null, QueryTriggerInteraction ignoreTriggers = QueryTriggerInteraction.Ignore)
+		{
+			if (!TryGetComponent<Collider>(out var thisCollider))
 			{
+#if UNITY_EDITOR
 				Debug.LogError("Cannot get overlap points because this object does not have a collider");
+#endif
 				return null;
 			}
+			LayerMask actualMask = collisionLayerMask ?? Physics.AllLayers;
+			int noOfOverlappingColliders = Physics.OverlapSphereNonAlloc(sourcePoint, radius, results, actualMask, ignoreTriggers);
 
-			var contactPoints = new List<Vector3>();
-			// Get all colliders overlapping the sphere
-			Collider[] colliders = Physics.OverlapSphere(sourcePoint, radius, collisionLayerMask, QueryTriggerInteraction.Ignore);
-
-			foreach (var hitCollider in colliders)
+			if (noOfOverlappingColliders >= results.Length)
 			{
-				if (Physics.ComputePenetration(
-					thisCollider, transform.position, transform.rotation,
-					hitCollider, hitCollider.transform.position, hitCollider.transform.rotation,
-					out Vector3 direction, out float distance))
+#if UNITY_EDITOR
+				Debug.LogWarning($"{gameObject.name} ::: Found {noOfOverlappingColliders} overlapping colliders, " +
+								 $"which matches or exceeds the 'results' array size of {results.Length}. " +
+								 $"Some colliders may have been missed. Increase the Collider[] results size.");
+#endif
+			}
+
+			List<Vector3> contactPointsFound = new List<Vector3>();
+			for (int i = 0; i < noOfOverlappingColliders; i++)
+			{
+				var pointToAdd = results[i].ClosestPoint(sourcePoint);
+				if (sourcePoint != pointToAdd)
 				{
-					// Approximate contact point
-					Vector3 contactPoint = hitCollider.ClosestPoint(sourcePoint) - direction * distance;
-					contactPoints.Add(contactPoint);
+					contactPointsFound.Add(results[i].ClosestPoint(sourcePoint));
 				}
 			}
 
-			return contactPoints;
+			return contactPointsFound;
 		}
 
 		#region Events
@@ -79,7 +86,7 @@ namespace MagmaFlow.Framework.Core
 		}
 		#endregion Events
 
-		#region Get subcomponents
+		#region Essentials
 
 		/// <summary>
 		/// Returns the instance of the given type in the child with the provided name of the provided parent
@@ -102,97 +109,74 @@ namespace MagmaFlow.Framework.Core
 			return default;
 		}
 
-		#endregion Get subcomponents
-
-		#region Invoke
-
 		/// <summary>
-		/// This is a coroutine-based wrapper and should not be confused with Unity's built-in string-based Invoke()
+		/// Invokes an action after with a delay.
 		/// </summary>
-		/// <param name="task"></param>
+		/// <param name="action"></param>
 		/// <param name="delay"></param>
-		protected void Invoke(UnityAction task, float delay = 0)
+		/// <returns>Returns the coroutine that handles the invoking.</returns>
+		protected Coroutine Invoke(Action action, float delay = 0)
 		{
-			if (task != null)
-			{
-				StartCoroutine(InvokeInternal(task, delay));
-			}
-			else
-			{
-				Debug.LogError($"Can't invoke a NULL action on {gameObject.name}!");
-				return;
-			}
+			return StartCoroutine(InvokeInternal(action, delay));
 		}
 
-		private IEnumerator InvokeInternal(UnityAction task, float delay)
+		private IEnumerator InvokeInternal(Action action, float delay)
 		{
 			yield return new WaitForSeconds(delay);
-
-			task?.Invoke();
+			action?.Invoke();
 		}
 
-		#endregion Invoke
+		#endregion Essentials
 
 		#region Custom GameObject Creation
 
 		/// <summary>
-		/// Creates an object with the given name and required component
+		/// Creates an object with the given name and required component, and sets its parent.
 		/// </summary>
 		/// <typeparam name="T"></typeparam>
 		/// <param name="name"></param>
+		/// <param name="parent"></param>
 		/// <returns></returns>
-		protected T CreateWithComponent<T>(string name) where T : Component
-		{	
-			var temp = new GameObject(name);
-			var tempT = temp?.AddComponent(typeof(T));
-			return (T)tempT;
-		}
-
-		/// <summary>
-		/// Creates an object with the given name and required component, and sets its parent
-		/// </summary>
-		/// <typeparam name="T"></typeparam>
-		/// <param name="Name"></param>
-		protected T CreateWithComponent<T>(string name, Transform parent) where T : Component
+		protected T CreateWithComponent<T>(string name, Transform parent = null) where T : Component
 		{
-			var temp = CreateWithComponent<T>(name);
-			temp?.transform.SetParent(parent);
-			return temp;
+			GameObject newObject = new GameObject(name);
+			if (parent != null)
+			{
+				newObject.transform.SetParent(parent);
+			}
+			return newObject.AddComponent<T>();
 		}
 
 		/// <summary>
-		/// Instantiates an object using an asset refference
+		/// Instantiates an object using an asset refference.
 		/// </summary>
 		/// <typeparam name="T"></typeparam>
 		/// <param name="assetReference"></param>
-		/// <param name="parent"></param>
 		/// <param name="position"></param>
 		/// <param name="rotation"></param>
+		/// <param name="parent"></param>
+		/// <param name="useWorldSpace"></param>
 		/// <returns></returns>
-		protected async Task<T> InstantiateAddressableAsync<T>
+		protected async Task<T> InstantiateAddressable<T>
 		(
 			AssetReference assetReference,
-			Transform parent,
 			Vector3 position,
-			Quaternion rotation
+			Quaternion rotation,
+			Transform parent = null,
+			bool useWorldSpace = true
 		) where T : UnityEngine.Object
 		{
 			if (assetReference == null || assetReference.RuntimeKeyIsValid() == false)
 			{
+#if UNITY_EDITOR
 				Debug.LogError("Instantiate addressable called with a null or invalid AssetReference.");
+#endif
 				return null;
 			}
 
 			try
 			{
-				GameObject instantiatedObject = await Addressables.InstantiateAsync(
-					assetReference,
-					position,
-					rotation,
-					parent
-				).Task;
-
-				// 2. Check if the *instantiatedObject* has the component.
+				var instantiatedObject = await Addressables.InstantiateAsync(assetReference, parent).Task;
 				if (instantiatedObject == null)
 				{
 #if UNITY_EDITOR
@@ -202,84 +186,65 @@ namespace MagmaFlow.Framework.Core
 					return null;
 				}
 
-				// Case 1: user asked for GameObject
-				if (typeof(T) == typeof(GameObject))
-					return instantiatedObject as T;
+				instantiatedObject.AddComponent<InstantiatedAddressableCleanup>();
 
-				// Case 2: user asked for a Component
+				if (!useWorldSpace && parent != null)
+				{
+					instantiatedObject.transform.SetLocalPositionAndRotation(position, rotation);
+				}
+				else
+				{
+					instantiatedObject.transform.SetPositionAndRotation(position, rotation);
+				}
+
+				// User asked for GameObject
+				if (typeof(T) == typeof(GameObject))
+				{
+					return instantiatedObject as T;
+				}
+
+				//User asked for a Component
 				if (typeof(Component).IsAssignableFrom(typeof(T)) &&
 					instantiatedObject.TryGetComponent(typeof(T), out var component))
 				{
-					instantiatedObject.AddComponent<InstantiatedAddressableCleanup>();
 					return component as T;
 				}
-
-				// No matching component found
-				Debug.LogError(
-					$"Prefab '{instantiatedObject.name}' does not contain component {typeof(T)}"
-				);
-				Addressables.ReleaseInstance(instantiatedObject);
-				return null;
+				else
+				{
+#if UNITY_EDITOR
+					// No matching component found
+					Debug.LogError($"Prefab '{instantiatedObject.name}' does not contain component {typeof(T)}. Performing cleanup");
+#endif	
+					Destroy(instantiatedObject);
+					return null;
+				}
 			}
 			catch (Exception e)
 			{
+#if UNITY_EDITOR
 				// Handle exceptions during the async operation
 				Debug.LogException(e);
+#endif
 				return null;
 			}
 		}
 
 		/// <summary>
-		/// Wrapper over InstantiateAddressableAsync() for better usability
+		/// Instantiates an object using an asset refference.
 		/// </summary>
 		/// <typeparam name="T"></typeparam>
 		/// <param name="assetReference"></param>
 		/// <param name="parent"></param>
-		/// <param name="position"></param>
-		/// <param name="rotation"></param>
-		/// <param name="onComplete"></param>
-		public void InstantiateAddressable<T>(
+		/// <param name="useWorldSpace"></param>
+		/// <returns></returns>
+		protected async Task<T> InstantiateAddressable<T>
+		(
 			AssetReference assetReference,
-			Transform parent,
-			Vector3 position,
-			Quaternion rotation,
-			UnityAction<T> onComplete = null
+			Transform parent = null,
+			bool useWorldSpace = true
 		) where T : UnityEngine.Object
 		{
-			// Start a coroutine to handle the async operation
-			// and its callback on the main thread.
-			StartCoroutine(InstantiateAddressableRoutine(
-				assetReference,
-				parent,
-				position,
-				rotation,
-				onComplete
-			));
-		}
-
-		private IEnumerator InstantiateAddressableRoutine<T>(
-			AssetReference assetReference,
-			Transform parent,
-			Vector3 position,
-			Quaternion rotation,
-			UnityAction<T> onComplete
-		) where T : UnityEngine.Object
-		{
-			// Await the async task. StartCoroutine will pause here
-			// and resume on the main thread when the task is done.
-			var task = InstantiateAddressableAsync<T>(assetReference, parent, position, rotation);
-			yield return new WaitUntil(() => task.IsCompleted);
-
-			if (task.IsCompletedSuccessfully)
-			{
-				onComplete?.Invoke(task.Result);
-			}
-			else if (task.IsFaulted)
-			{
-#if UNITY_EDITOR
-				Debug.LogException(new Exception($"An error occurred during {assetReference.editorAsset.name} instantiation.", task.Exception));
-#endif
-			}
+			return await InstantiateAddressable<T>(assetReference, new Vector3(0, 0, 0), Quaternion.identity, parent, useWorldSpace);
 		}
 
 		#endregion Custom GameObject Creation

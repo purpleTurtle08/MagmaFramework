@@ -11,7 +11,38 @@ namespace MagmaFlow.Framework.Utils
 	public static partial class MagmaUtils
 	{
 		private static readonly Encoding DEFAULT_ENCODING = new UTF8Encoding(false);
-		
+
+		/// <summary>
+		/// Divides one vector by another, component by component.
+		/// This is the C# extension method equivalent to Vector3.Scale().
+		/// </summary>
+		/// <param name="a">The dividend.</param>
+		/// <param name="b">The divisor.</param>
+		/// <returns>A new Vector3 with the component-wise division.</returns>
+		public static Vector3 Vector3_Divide(Vector3 a, Vector3 b)
+		{
+			return new Vector3(
+				(b.x == 0) ? a.x : a.x / b.x,
+				(b.y == 0) ? a.y : a.y / b.y,
+				(b.z == 0) ? a.z : a.z / b.z
+			);
+		}
+
+		/// <summary>
+		/// Divides one vector by another, component by component.
+		/// This is the C# extension method equivalent to Vector3.Scale().
+		/// </summary>
+		/// <param name="a">The dividend.</param>
+		/// <param name="b">The divisor.</param>
+		/// <returns>A new Vector3 with the component-wise division.</returns>
+		public static Vector2 Vector2_Divide(Vector2 a, Vector2 b)
+		{
+			return new Vector3(
+				(b.x == 0) ? a.x : a.x / b.x,
+				(b.y == 0) ? a.y : a.y / b.y
+			);
+		}
+
 		///<summary>
 		/// Returns the time (in seconds) formatted.
 		/// <para>Format if addLetters set TRUE = xx'H':xx'M':xx's'</para>

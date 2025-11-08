@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
+using UnityEngine.UIElements;
 
 namespace MagmaFlow.Framework.Pooling
 {
@@ -175,12 +176,14 @@ namespace MagmaFlow.Framework.Pooling
 		private void ReleaseInstanceInternal(IPoolableObject pooledObject)
 		{
 			if (pooledObject == null) return;
+			var _monoBehaviour = pooledObject.MonoBehaviour;
+
 			pooledObject.OnRelease();
-			pooledObject.MonoBehaviour.gameObject.SetActive(false);
-			pooledObject.MonoBehaviour.transform.SetParent(genericPooledObjectsParent);
+			_monoBehaviour.gameObject.SetActive(false);
+			_monoBehaviour.transform.SetParent(genericPooledObjectsParent);
 			var assetReference = lookUp[pooledObject];
 			if (pool[assetReference].Count >= MaximumPoolSize)
-				Destroy(pooledObject.MonoBehaviour.gameObject);
+				Destroy(_monoBehaviour.gameObject);
 			else
 				pool[assetReference].Enqueue(pooledObject);
 		}
@@ -380,6 +383,7 @@ namespace MagmaFlow.Framework.Pooling
 
 		/// <summary>
 		/// Instantiates or retrieves a pooled object and returns the component of type T.
+		/// Can only be called from the main thread.
 		/// </summary>
 		/// <typeparam name="T"></typeparam>
 		/// <param name="assetReference"></param>
@@ -388,12 +392,14 @@ namespace MagmaFlow.Framework.Pooling
 		/// <param name="rotation"></param>
 		/// <param name="useWorldSpace"></param>
 		/// <returns></returns>
-		public async Task<T> InstantiatePooledObject<T>(
+		public async Task<T> InstantiatePooledObject<T>
+		(
 			AssetReference assetReference,
-			Transform parent,
 			Vector3 position,
 			Quaternion rotation,
-			bool useWorldSpace) where T : Component
+			Transform parent = null,
+			bool useWorldSpace = true
+		) where T : Component
 		{
 			if (assetReference == null)
 			{
@@ -455,6 +461,25 @@ namespace MagmaFlow.Framework.Pooling
 		}
 
 		/// <summary>
+		/// Instantiates or retrieves a pooled object and returns the component of type T.
+		/// Can only be called from the main thread.
+		/// </summary>
+		/// <typeparam name="T"></typeparam>
+		/// <param name="assetReference"></param>
+		/// <param name="parent"></param>
+		/// <param name="useWorldSpace"></param>
+		/// <returns></returns>
+		public async Task<T> InstantiatePooledObject<T>
+		(
+			AssetReference assetReference,
+			Transform parent = null,
+			bool useWorldSpace = true
+		) where T : Component
+		{
+			return await InstantiatePooledObject<T>(assetReference, new Vector3(0, 0, 0), Quaternion.identity, parent, useWorldSpace);
+		}
+
+		/// <summary>
 		/// Releases the active pooled object instances, returning them to the pool and disabling the gameObject.
 		/// </summary>
 		public void ReleaseAllObjects()
@@ -468,6 +493,7 @@ namespace MagmaFlow.Framework.Pooling
 
 		/// <summary>
 		/// Releases the object back into the pool.
+		/// Disables the game object.
 		/// </summary>
 		/// <param name="pooledObject"></param>
 		public void ReleaseObject(IPoolableObject pooledObject)

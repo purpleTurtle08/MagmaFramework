@@ -190,7 +190,9 @@ namespace MagmaFlow.Framework.Core
 		/// <param name="affectTimeScale">If set to true, this will set the time scale as well</param>
 		public void PauseGame(bool value, bool affectTimeScale = false)
 		{
-			if (affectTimeScale) Time.timeScale = value ? 0 : 1;
+			if (affectTimeScale)
+				Time.timeScale = value ? 0 : 1;
+
 			IsGamePaused = value;
 			MagmaFramework_EventBus.Publish(new GamePausedEvent(IsGamePaused));
 		}
