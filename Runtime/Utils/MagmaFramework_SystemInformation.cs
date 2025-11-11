@@ -85,7 +85,7 @@ namespace MagmaFlow.Framework.Utils
 		{
 			if (Instance != null && Instance != this)
 			{
-				Debug.LogWarning($"Removed {name}, as it is a duplicate. Ensure you only have 1 {name} per scene.");
+				//Debug.LogWarning($"Removed {name}, as it is a duplicate. Ensure you only have 1 {name} per scene.");
 				Destroy(gameObject);
 				return false;
 			}

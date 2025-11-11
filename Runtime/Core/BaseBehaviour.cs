@@ -20,23 +20,31 @@ namespace MagmaFlow.Framework.Core
 		protected MagmaFramework_MusicManager MagmaFramework_MusicManager => MagmaFramework_MusicManager.Instance;
 
 		/// <summary>
-		/// Finds all colliders that are within the overlap sphere of this sourcePoint.
+		/// Finds the closest points (to the sourcePoint) on all colliders that are within the overlap sphere of this sourcePoint.
+		/// <para>! WARNING ! Make sure to exclude this object from the layermask used, when using passThrough = false</para>
 		/// </summary>
 		/// <param name="results">A pre-allocated array to store overlap results (prevents garbage).</param>
 		/// <param name="sourcePoint">The center of the overlap sphere.</param>
 		/// <param name="radius">The radius of the overlap sphere.</param>
 		/// <param name="collisionLayerMask">The layers to check against.</param>
 		/// <param name="ignoreTriggers">How to handle trigger colliders.</param>
+		/// <param name="passThrough">Points on colliders that are considered 'backfaces will be ignored'.</param>
 		/// <returns>Returns a list of approximate contact points on those colliders.</returns>
-		protected List<Vector3> GetOverlapContactPoints(ref Collider[] results, Vector3 sourcePoint, float radius, LayerMask? collisionLayerMask = null, QueryTriggerInteraction ignoreTriggers = QueryTriggerInteraction.Ignore)
+		protected List<Vector3> GetOverlapContactPoints
+		(
+			ref Collider[] results, 
+			Vector3 sourcePoint, 
+			float radius, 
+			LayerMask? collisionLayerMask = null, 
+			QueryTriggerInteraction ignoreTriggers = QueryTriggerInteraction.Ignore, 
+			bool passThrough = true
+		)
 		{
-			if (!TryGetComponent<Collider>(out var thisCollider))
+			if (TryGetComponent<Collider>(out var thisCollider))
 			{
-#if UNITY_EDITOR
-				Debug.LogError("Cannot get overlap points because this object does not have a collider");
-#endif
-				return null;
+				thisCollider.enabled = false;
 			}
+
 			LayerMask actualMask = collisionLayerMask ?? Physics.AllLayers;
 			int noOfOverlappingColliders = Physics.OverlapSphereNonAlloc(sourcePoint, radius, results, actualMask, ignoreTriggers);
 
@@ -45,7 +53,7 @@ namespace MagmaFlow.Framework.Core
 #if UNITY_EDITOR
 				Debug.LogWarning($"{gameObject.name} ::: Found {noOfOverlappingColliders} overlapping colliders, " +
 								 $"which matches or exceeds the 'results' array size of {results.Length}. " +
-								 $"Some colliders may have been missed. Increase the Collider[] results size.");
+								 $"Some colliders may have been missed. Increase the Collider[] results size OR decrease the range, when calling GetOverlapContactPoints().");
 #endif
 			}
 
@@ -55,30 +63,53 @@ namespace MagmaFlow.Framework.Core
 				var pointToAdd = results[i].ClosestPoint(sourcePoint);
 				if (sourcePoint != pointToAdd)
 				{
-					contactPointsFound.Add(results[i].ClosestPoint(sourcePoint));
+					if (passThrough) 
+					{
+						contactPointsFound.Add(pointToAdd);
+					}
+					else
+					{
+						if(!Physics.Linecast(pointToAdd, sourcePoint, actualMask))
+						{
+							contactPointsFound.Add(pointToAdd);
+						}
+					}
 				}
 			}
 
+			if(thisCollider != null) thisCollider.enabled = true;
 			return contactPointsFound;
 		}
 
 		#region Events
+		/// <summary>
+		/// Fired when MagmaFramework_Core.PauseGame() is called.
+		/// </summary>
+		/// <param name="eventData"></param>
 		protected virtual void OnGamePaused(GamePausedEvent eventData) { }
+		/// <summary>
+		/// Fired when SceneManager.onSceneLoaded is fired.
+		/// </summary>
+		/// <param name="eventData"></param>
 		protected virtual void OnSceneLoaded(SceneLoadedEvent eventData) { }
+		/// <summary>
+		/// Fired when SceneManager.onSceneUnloaded is fired.
+		/// </summary>
+		/// <param name="eventData"></param>
 		protected virtual void OnSceneUnloaded(SceneUnloadedEvent eventData) { }
-		protected virtual void OnDestroy()
+		private void OnDestroy()
 		{
 			MagmaFramework_EventBus.Unsubscribe<GamePausedEvent>(OnGamePaused);
 			MagmaFramework_EventBus.Unsubscribe<SceneLoadedEvent>(OnSceneLoaded);
 			MagmaFramework_EventBus.Unsubscribe<SceneUnloadedEvent>(OnSceneUnloaded);
 		}
-		protected virtual void OnEnable()
+		private void OnEnable()
 		{
 			MagmaFramework_EventBus.Subscribe<GamePausedEvent>(OnGamePaused);
 			MagmaFramework_EventBus.Subscribe<SceneLoadedEvent>(OnSceneLoaded);
 			MagmaFramework_EventBus.Subscribe<SceneUnloadedEvent>(OnSceneUnloaded);
 		}
-		protected virtual void OnDisable()
+		private void OnDisable()
 		{
 			MagmaFramework_EventBus.Unsubscribe<GamePausedEvent>(OnGamePaused);
 			MagmaFramework_EventBus.Unsubscribe<SceneLoadedEvent>(OnSceneLoaded);

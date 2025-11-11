@@ -16,7 +16,7 @@ namespace MagmaFlow.Framework.Events
 		/// <param name="scene"></param>
 		/// <param name="loadSceneMode"></param>
 		public SceneLoadedEvent(Scene scene, LoadSceneMode loadSceneMode)
-		{
+		{	
 			Scene = scene;
 			LoadSceneMode = loadSceneMode;
 		}
@@ -66,13 +66,16 @@ namespace MagmaFlow.Framework.Events
 	public struct GamePausedEvent
 	{
 		public bool Status;
+		public bool WasTimeScaleAffected;
 		/// <summary>
 		/// This event is fired inside MagmaFramework_Core component
 		/// </summary>
-		/// <param name="status"></param>
-		public GamePausedEvent(bool status)
+		/// <param name="status">The pause state of the game</param>
+		/// <param name="wasTimeScaleAffected">Indicates if the time scale has been affected</param>
+		public GamePausedEvent(bool status, bool wasTimeScaleAffected)
 		{
 			Status = status;
+			WasTimeScaleAffected = wasTimeScaleAffected;
 		}
 	}
 }

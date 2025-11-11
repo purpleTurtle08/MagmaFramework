@@ -7,20 +7,23 @@ using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
-using UnityEngine.UIElements;
 
 namespace MagmaFlow.Framework.Pooling
 {
 	public interface IPoolableObject
-	{
+	{	
+		/// <summary>
+		/// Indicates if the object is currently the pool or active.
+		/// </summary>
 		public bool IsActive { get; }
 		public MonoBehaviour MonoBehaviour => this as MonoBehaviour;
 		/// <summary>
-		/// Called AFTER an object is retrieved from the pool
+		/// Called after a pooled object is instantiated.
 		/// </summary>
 		public void OnInitialize();
 		/// <summary>
-		/// Releases the object back into the pool by setting the game object as inactive
+		///	Called when a pooled object is released back into the pool.
+		/// The object is also set inactive by the pooled manager.
 		/// </summary>
 		public void OnRelease();
 	}
@@ -53,8 +56,8 @@ namespace MagmaFlow.Framework.Pooling
 
 		public static MagmaFramework_PooledObjectsManager Instance { get; private set; }
 		[SerializeField][Tooltip("This will be used when initializing the PooledObjectsManager.\nA value of 256 is recommended to avoid bloating up the memory with too many pooled instances.\n-1 for no limit")] private int maximumPoolSize = -1;
-		[SerializeField][Tooltip("Keeps all the active pooled instances alive (if they are alive) upon scene changing.\nRECOMMENDED VALUE:: FALSE")] private bool keepInstancesAlive = false;
-		[SerializeField][Tooltip("Clears all the pooled objects.\nIf you never use the same assets in different scenes, you might want to consider disabling this.")] private bool keepPools = true;
+		[SerializeField][Tooltip("Keeps all the active pooled instances alive (if they are alive) upon scene changing.\nRECOMMENDED VALUE:: FALSE")] private bool keepInstancesAliveOnSceneChange = false;
+		[SerializeField][Tooltip("Clears / Keeps all the pooled objects.\nIf you never use the same assets in different scenes, you might want to consider disabling this.")] private bool keepPoolsOnSceneChange = true;
 
 		private void Awake()
 		{
@@ -73,7 +76,7 @@ namespace MagmaFlow.Framework.Pooling
 		{
 			if (Instance != null && Instance != this)
 			{
-				Debug.LogWarning($"Removed {name}, as it is a duplicate. Ensure you only have 1 {name} per scene.");
+				//Debug.LogWarning($"Removed {name}, as it is a duplicate. Ensure you only have 1 {name} per scene.");
 				Destroy(gameObject);
 				return false;
 			}
@@ -162,10 +165,10 @@ namespace MagmaFlow.Framework.Pooling
 			CancelAllPrewarmOperations();
 			CancelAllInstantiateOperation();
 
-			if(!keepPools)
+			if(!keepPoolsOnSceneChange)
 				ClearObjectPools(true);
 
-			if(!keepInstancesAlive)
+			if(!keepInstancesAliveOnSceneChange)
 				ReleaseAllObjects();
 		}
 
@@ -345,6 +348,9 @@ namespace MagmaFlow.Framework.Pooling
 			}
 			if (currentPool.Count >= count)
 			{
+#if UNITY_EDITOR
+				Debug.Log($"Pre-warm pool {assetReference.editorAsset.name} request ignored, because the pool is already this size or larger!");
+#endif
 				return;
 			}
 			int difference = count - currentPool.Count;
@@ -516,7 +522,7 @@ namespace MagmaFlow.Framework.Pooling
 		{
 			isClearing = true;
 
-			// 1. Destroy all INACTIVE objects (in the queues)
+			// Destroy all INACTIVE objects (in the queues)
 			foreach (var queue in pool.Values)
 			{
 				while (queue.Count > 0)
@@ -532,10 +538,7 @@ namespace MagmaFlow.Framework.Pooling
 			}
 			pool.Clear();
 
-			// 2. Destroy all ACTIVE objects (in the lookup)
-			// We MUST copy to a new List, because PooledInstanceCleanup.OnDestroy()
-			// will modify the 'lookUp' dictionary as we iterate.
-			var activeObjects = new List<IPoolableObject>(lookUp.Keys);
+
 			foreach (var pooledObject in lookUp.Keys)
 			{
 				if (pooledObject != null && pooledObject.MonoBehaviour != null)

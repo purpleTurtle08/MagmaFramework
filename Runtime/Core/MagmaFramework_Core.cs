@@ -97,7 +97,7 @@ namespace MagmaFlow.Framework.Core
 		{
 			if (Instance != null && Instance != this)
 			{
-				Debug.LogWarning($"Removed {name}, as it is a duplicate. Ensure you only have 1 {name} per scene.");
+				//Debug.LogWarning($"Removed {name}, as it is a duplicate. Ensure you only have 1 {name} per scene.");
 				Destroy(gameObject);
 				return false;
 			}
@@ -187,14 +187,14 @@ namespace MagmaFlow.Framework.Core
 		/// Pause/unpause the game.
 		/// </summary>
 		/// <param name="value">True is game pause, false is unpaused</param>
-		/// <param name="affectTimeScale">If set to true, this will set the time scale as well</param>
+		/// <param name="affectTimeScale">If set to true, this will set the time scale as well, considering the pause game status provided</param>
 		public void PauseGame(bool value, bool affectTimeScale = false)
 		{
 			if (affectTimeScale)
 				Time.timeScale = value ? 0 : 1;
 
 			IsGamePaused = value;
-			MagmaFramework_EventBus.Publish(new GamePausedEvent(IsGamePaused));
+			MagmaFramework_EventBus.Publish(new GamePausedEvent(IsGamePaused, affectTimeScale));
 		}
 	}
 }
