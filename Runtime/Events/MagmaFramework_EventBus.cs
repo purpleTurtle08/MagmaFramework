@@ -178,12 +178,10 @@ namespace MagmaFlow.Framework.Events
 					}
 					catch (Exception e)
 					{
-#if UNITY_EDITOR
 						// Catch errors from individual subscribers so one bad callback
 						// doesn't stop all other subscribers from receiving the event.
 						Debug.LogError($"Error in EventBus subscriber for event: -{eventType.Name}-");
 						Debug.LogException(e);
-#endif
 					}
 				}
 

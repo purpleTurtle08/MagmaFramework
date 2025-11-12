@@ -131,8 +131,6 @@ namespace MagmaFlow.Framework.Core
 #if UNITY_EDITOR
 			// If we are inside the editor, we don't do anything
 #else
-			currentResolution = resolution;
-			currentScreenMode = mode;
 			Screen.SetResolution(resolution.width, resolution.height, mode, resolution.refreshRateRatio);
 			Debug.Log($"Screen size changed to :: {resolution.width}x{resolution.height} {resolution.refreshRateRatio.value}");
 #endif

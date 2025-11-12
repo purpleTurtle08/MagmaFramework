@@ -252,10 +252,8 @@ namespace MagmaFlow.Framework.Core
 			}
 			catch (Exception e)
 			{
-#if UNITY_EDITOR
 				// Handle exceptions during the async operation
 				Debug.LogException(e);
-#endif
 				return null;
 			}
 		}

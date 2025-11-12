@@ -13,9 +13,8 @@ namespace MagmaFlow.Framework.Pooling
 	public interface IPoolableObject
 	{	
 		/// <summary>
-		/// Indicates if the object is currently the pool or active.
+		/// Access to the MonoBehaviour attached to this object
 		/// </summary>
-		public bool IsActive { get; }
 		public MonoBehaviour MonoBehaviour => this as MonoBehaviour;
 		/// <summary>
 		/// Called after a pooled object is instantiated.
@@ -258,9 +257,9 @@ namespace MagmaFlow.Framework.Pooling
 			}
 			catch (Exception e)
 			{
-#if UNITY_EDITOR
+
 				Debug.LogException(e);
-#endif
+
 				return null;
 			}
 		}
@@ -434,9 +433,9 @@ namespace MagmaFlow.Framework.Pooling
 				}
 				catch(Exception e)
 				{
-#if UNITY_EDITOR
+
 					Debug.LogException(e);
-#endif
+
 				}
 				finally
 				{
@@ -492,8 +491,7 @@ namespace MagmaFlow.Framework.Pooling
 		{
 			foreach(var activeInstance in lookUp.Keys)
 			{	
-				if(activeInstance.IsActive)
-					ReleaseInstanceInternal(activeInstance);
+				ReleaseInstanceInternal(activeInstance);
 			}
 		}
 
