@@ -4,7 +4,7 @@
   "readme": "readme.md",
   "version": "2.6.3",
   "displayName": "Magma Framework",
-  "description": "A comprehensive framework for building games in Unity; \n- object pooling\n- event management\n- extensions\n- utilities\n- minimal profiling",
+  "description": "A comprehensive framework for building games in Unity; \n- object pooling\n- event management\n- extensions\n- utilities\n- minimal profiling\n\nDocumentation can be found at: https://docs.google.com/document/d/1_v2yFBbT9sble8bZTTgPfpZOcjiiAbKannSIF90Vvc4/edit?usp=sharing",
   "unity": "6000.2",
   "dependencies": {
     "com.unity.addressables": "2.7.4",
