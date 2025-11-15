@@ -8,9 +8,9 @@ using Newtonsoft.Json;
 using UnityEngine;
 
 namespace MagmaFlow.Framework.Utils
-{	
+{
 	/// <summary>
-	/// If you have the Newtonsoft.Json package in your project, then you can use these utils
+	/// Add 'MAGMA_FRAMEWORK_USE_NEWTONSOFT' if you have Newtonsoft.Json package installed in order to use this utility.
 	/// </summary>
 	public static partial class MagmaUtils
 	{
