@@ -16,7 +16,7 @@ Full documentation is available [here](https://docs.google.com/document/d/1_v2yF
 
 ## 💡 Why Use Magma Framework
 
-Many Unity projects end up re-implementing common systems (pooling, event dispatch, profiling). Magma Framework offers battle-tested implementations that are:
+Many Unity projects end up re-implementing common systems (pooling, event dispatch). Magma Framework offers implementations that are:
 
 - **Efficient** — Especially for memory and performance  
 - **Modular** — Pick and choose which parts you want to use  
@@ -28,9 +28,9 @@ Many Unity projects end up re-implementing common systems (pooling, event dispat
 2. Add the prefab for the service that you want to use (each service is a singleton); 
    - MagmaFramework_Core
    - MagmaFramework_PoolingManager
+   - MagmaFramework_SystemInformation
 3. All game objects should inherit from BaseBehaviour
 3. Configure Addressables (if using the pooling system)  
 4. Use the event bus by subscribing/publishing events  
-5. (Optional) Add the profiler UI to your scene to start measuring  
 
 > For more detailed setup, check the [documentation](https://docs.google.com/document/d/1_v2yFBbT9sble8bZTTgPfpZOcjiiAbKannSIF90Vvc4/edit?usp=sharing).
