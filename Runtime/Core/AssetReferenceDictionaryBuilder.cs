@@ -28,7 +28,7 @@ namespace MagmaFlow.Framework.Core
 		/// Read-only view of the mapping from prefab/asset name to AssetReference.
 		/// </summary>
 		public IReadOnlyDictionary<string, AssetReference> AssetReferences => assetReferencesDictionary;
-
+		
 		/// <summary>
 		/// Called in editor when values change. Validates and populates the persistent keys array.
 		/// This runs only in the editor.
@@ -181,12 +181,11 @@ namespace MagmaFlow.Framework.Core
 		}
 
 		/// <summary>
-		/// Get an AssetReference by name or null if not found. Optionally log an error.
+		/// Get an AssetReference by name or null if not found.
 		/// </summary>
 		/// <param name="assetName"></param>
-		/// <param name="logIfMissing"></param>
 		/// <returns></returns>
-		public AssetReference GetAssetReference(string assetName, bool logIfMissing = true)
+		public AssetReference GetAssetReference(string assetName)
 		{
 			if (TryGetAssetReference(assetName, out var ar))
 				return ar;
