@@ -1,5 +1,8 @@
 using UnityEngine;
 using System.Diagnostics;
+using System;
+using Object = UnityEngine.Object;
+using Debug = UnityEngine.Debug;
 
 namespace MagmaFlow.Framework.Utils
 {
@@ -19,7 +22,7 @@ namespace MagmaFlow.Framework.Utils
 		[Conditional("DEVELOPMENT_BUILD")]
 		public static void Log(object message, Object context = null)
 		{
-			UnityEngine.Debug.Log(message, context);
+			Debug.Log(message, context);
 		}
 
 		/// <summary>
@@ -32,7 +35,7 @@ namespace MagmaFlow.Framework.Utils
 		[Conditional("DEVELOPMENT_BUILD")]
 		public static void LogWarning(object message, Object context = null)
 		{
-			UnityEngine.Debug.LogWarning(message, context);
+			Debug.LogWarning(message, context);
 		}
 
 		/// <summary>
@@ -59,7 +62,20 @@ namespace MagmaFlow.Framework.Utils
 		[Conditional("DEVELOPMENT_BUILD")]
 		public static void LogFramework(object message, Object context = null)
 		{
-			UnityEngine.Debug.Log($"<b><color=#FF5733>[MagmaFlow]</color></b> {message}", context);
+			Debug.Log($"<b><color=#FF5733>[MagmaFlow]</color></b> {message}", context);
+		}
+
+		/// <summary>
+		/// Logs an exception message to the Unity Console.
+		/// This method is conditionally compiled and will be stripped from non-development release builds.
+		/// </summary>
+		/// <param name="e"></param>
+		/// <param name="context"></param>
+		[Conditional("UNITY_EDITOR")]
+		[Conditional("DEVELOPMENT_BUILD")]
+		public static void LogException(Exception e, Object context = null) 
+		{
+			Debug.LogException(e);
 		}
 	}
 }
