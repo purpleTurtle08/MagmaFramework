@@ -82,6 +82,9 @@ namespace MagmaFlow.Framework.Core
 		}
 
 		#region Events
+
+		private bool _isSubscribedToFrameworkEvents = false;
+
 		/// <summary>
 		/// Fired when MagmaFramework_Core.PauseGame() is called.
 		/// </summary>
@@ -99,21 +102,27 @@ namespace MagmaFlow.Framework.Core
 		protected virtual void OnSceneUnloaded(SceneUnloadedEvent eventData) { }
 		private void OnDestroy()
 		{
-			MagmaFramework_EventBus.Unsubscribe<GamePausedEvent>(OnGamePaused);
-			MagmaFramework_EventBus.Unsubscribe<SceneLoadedEvent>(OnSceneLoaded);
-			MagmaFramework_EventBus.Unsubscribe<SceneUnloadedEvent>(OnSceneUnloaded);
+			OnDisable();
 		}
 		private void OnEnable()
 		{
+			if (_isSubscribedToFrameworkEvents) return;
+
 			MagmaFramework_EventBus.Subscribe<GamePausedEvent>(OnGamePaused);
 			MagmaFramework_EventBus.Subscribe<SceneLoadedEvent>(OnSceneLoaded);
 			MagmaFramework_EventBus.Subscribe<SceneUnloadedEvent>(OnSceneUnloaded);
+
+			_isSubscribedToFrameworkEvents = true;
 		}
 		private void OnDisable()
 		{
+			if (!_isSubscribedToFrameworkEvents) return;
+
 			MagmaFramework_EventBus.Unsubscribe<GamePausedEvent>(OnGamePaused);
 			MagmaFramework_EventBus.Unsubscribe<SceneLoadedEvent>(OnSceneLoaded);
 			MagmaFramework_EventBus.Unsubscribe<SceneUnloadedEvent>(OnSceneUnloaded);
+
+			_isSubscribedToFrameworkEvents = false;
 		}
 		#endregion Events
 
