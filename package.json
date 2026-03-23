@@ -1,8 +1,10 @@
 {
   "name": "com.magmaflowgames.framework",
-  "author": "Magma Flow Games",
+  "author": {
+    "name": "Magma Flow Games"
+  },
   "readme": "readme.md",
-  "version": "2.6.3",
+  "version": "2.6.4",
   "displayName": "Magma Framework",
   "description": "A comprehensive framework for building games in Unity; \n- object pooling\n- event management\n- extensions\n- utilities\n- minimal profiling\n\nDocumentation can be found at: https://docs.google.com/document/d/1_v2yFBbT9sble8bZTTgPfpZOcjiiAbKannSIF90Vvc4/edit?usp=sharing",
   "unity": "6000.2",
