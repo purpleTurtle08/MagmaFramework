@@ -5,47 +5,46 @@ using System.IO;
 using System.IO.Compression;
 using System.Text;
 using Newtonsoft.Json;
-using UnityEngine;
 
 namespace MagmaFlow.Framework.Utils
 {
-	/// <summary>
-	/// Add 'MAGMA_FRAMEWORK_USE_NEWTONSOFT' if you have Newtonsoft.Json package installed in order to use this utility.
-	/// </summary>
 	public static partial class MagmaUtils
 	{
 		/// <summary>
 		/// <para>[REQUIRES NEWTONSOFT.JSON]</para>
-		/// Serializes an object to a compressed UTF-8 JSON byte array.
+		/// Serializes an object to a compressed UTF-8 JSON byte array with zero string allocations.
 		/// </summary>
-		public static byte[] ObjectToByteArray(System.Object obj)
+		public static byte[] ObjectToByteArray(object obj)
 		{
 			if (obj == null)
 				throw new ArgumentNullException(nameof(obj));
 
 			try
 			{
-				string json = JsonConvert.SerializeObject(obj);
-				byte[] jsonBytes = Encoding.UTF8.GetBytes(json);
-
 				using var output = new MemoryStream();
+
+				// Chain the streams together. 
+				// The leaveOpen flag is crucial so GZipStream doesn't close our MemoryStream before we read it!
 				using (var gzip = new GZipStream(output, CompressionMode.Compress, leaveOpen: true))
+				using (var streamWriter = new StreamWriter(gzip, Encoding.UTF8))
+				using (var jsonWriter = new JsonTextWriter(streamWriter))
 				{
-					gzip.Write(jsonBytes, 0, jsonBytes.Length);
-				} // disposing flushes automatically
+					var serializer = new JsonSerializer();
+					serializer.Serialize(jsonWriter, obj);
+				} // Disposing these flushes the compressor automatically
 
 				return output.ToArray();
 			}
 			catch (Exception ex)
 			{
-				Debug.LogError($"[SerializationUtil] Failed to serialize object: {ex}");
+				LogError($"[SerializationUtil] Failed to serialize object: {ex}");
 				return null;
 			}
 		}
 
 		/// <summary>
 		/// <para>[REQUIRES NEWTONSOFT.JSON]</para>
-		/// Decompresses and deserializes an object from a compressed UTF-8 JSON byte array.
+		/// Decompresses and deserializes an object from a compressed UTF-8 JSON byte array seamlessly.
 		/// </summary>
 		public static T ByteArrayToObject<T>(byte[] data) where T : class
 		{
@@ -54,18 +53,18 @@ namespace MagmaFlow.Framework.Utils
 
 			try
 			{
+				// Read directly from the byte array, through the decompressor, straight into Newtonsoft
 				using var input = new MemoryStream(data);
 				using var gzip = new GZipStream(input, CompressionMode.Decompress);
-				using var output = new MemoryStream();
+				using var streamReader = new StreamReader(gzip, Encoding.UTF8);
+				using var jsonReader = new JsonTextReader(streamReader);
 
-				gzip.CopyTo(output);
-
-				string json = Encoding.UTF8.GetString(output.ToArray());
-				return JsonConvert.DeserializeObject<T>(json);
+				var serializer = new JsonSerializer();
+				return serializer.Deserialize<T>(jsonReader);
 			}
 			catch (Exception ex)
 			{
-				Debug.LogError($"[SerializationUtil] Failed to deserialize bytes to object: {ex}");
+				LogError($"[SerializationUtil] Failed to deserialize bytes to object: {ex}");
 				return null;
 			}
 		}
