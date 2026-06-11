@@ -82,38 +82,20 @@ namespace MagmaFlow.Framework.Core
 		}
 
 		#region Events
-
 		private bool _isSubscribedToFrameworkEvents = false;
-
 		/// <summary>
 		/// Fired when MagmaFramework_Core.PauseGame() is called.
 		/// </summary>
 		/// <param name="eventData"></param>
 		protected virtual void OnGamePaused(GamePausedEvent eventData) { }
-		/// <summary>
-		/// Fired when SceneManager.onSceneLoaded is fired.
-		/// </summary>
-		/// <param name="eventData"></param>
-		protected virtual void OnSceneLoaded(SceneLoadedEvent eventData) { }
-		/// <summary>
-		/// Fired when SceneManager.onSceneUnloaded is fired.
-		/// </summary>
-		/// <param name="eventData"></param>
-		protected virtual void OnSceneUnloaded(SceneUnloadedEvent eventData) { }
 		private void OnDestroy()
 		{
 			MagmaFramework_EventBus.Unsubscribe<GamePausedEvent>(OnGamePaused);
-			MagmaFramework_EventBus.Unsubscribe<SceneLoadedEvent>(OnSceneLoaded);
-			MagmaFramework_EventBus.Unsubscribe<SceneUnloadedEvent>(OnSceneUnloaded);
 		}
 		private void Awake()
 		{
 			if (_isSubscribedToFrameworkEvents) return;
-
 			MagmaFramework_EventBus.Subscribe<GamePausedEvent>(OnGamePaused);
-			MagmaFramework_EventBus.Subscribe<SceneLoadedEvent>(OnSceneLoaded);
-			MagmaFramework_EventBus.Subscribe<SceneUnloadedEvent>(OnSceneUnloaded);
-
 			_isSubscribedToFrameworkEvents = true;
 		}
 		#endregion Events

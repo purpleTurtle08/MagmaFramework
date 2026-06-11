@@ -1,5 +1,4 @@
-﻿using MagmaFlow.Framework.Events;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -7,6 +6,7 @@ using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
+using UnityEngine.SceneManagement;
 
 namespace MagmaFlow.Framework.Pooling
 {
@@ -148,18 +148,18 @@ namespace MagmaFlow.Framework.Pooling
 			var poolRoot = new GameObject("Pooled Objects Container");
 			poolRoot.transform.SetParent(transform);
 			genericPooledObjectsParent = poolRoot.transform;
-			MagmaFramework_EventBus.Subscribe<SceneUnloadedEvent>(OnSceneUnload);
+			SceneManager.sceneUnloaded += OnSceneUnload;
 		}
 
 		private void OnDestroy()
 		{
-			MagmaFramework_EventBus.Unsubscribe<SceneUnloadedEvent>(OnSceneUnload);
+			SceneManager.sceneUnloaded -= OnSceneUnload;
 			CancelAllPrewarmOperations();
 			CancelAllInstantiateOperation();
 			ClearObjectPools(true);
 		}
 
-		private void OnSceneUnload(SceneUnloadedEvent eventData)
+		private void OnSceneUnload(Scene eventData)
 		{
 			CancelAllPrewarmOperations();
 			CancelAllInstantiateOperation();

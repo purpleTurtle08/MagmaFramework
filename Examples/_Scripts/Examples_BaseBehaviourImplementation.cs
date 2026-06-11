@@ -45,26 +45,6 @@ namespace MagmaFlow.Framework.Examples
 			//My logic here
 		}
 		/// <summary>
-		/// You can override this subscriber (if you are inheriting from BaseBehaviour), and do your custom logic inside here
-		/// </summary>
-		/// <param name="eventData"></param>
-		protected override void OnSceneLoaded(SceneLoadedEvent eventData)
-		{
-			base.OnSceneLoaded(eventData);
-			//TO DO: 
-			//My logic here
-		}
-		/// <summary>
-		/// You can override this subscriber (if you are inheriting from BaseBehaviour), and do your custom logic inside here
-		/// </summary>
-		/// <param name="eventData"></param>
-		protected override void OnSceneUnloaded(SceneUnloadedEvent eventData)
-		{
-			base.OnSceneUnloaded(eventData);
-			//TO DO: 
-			//My logic here
-		}
-		/// <summary>
 		/// This method exemplifies the use of GetOverlapContactPoints(), as well as instantiating a pooled object or an addressable
 		/// </summary>
 		private async void DisplayOverlapContactPoints()

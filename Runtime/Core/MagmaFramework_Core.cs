@@ -56,38 +56,6 @@ namespace MagmaFlow.Framework.Core
 			{
 				return;
 			}
-
-			SceneManager.sceneLoaded += OnSceneLoaded;
-			SceneManager.sceneUnloaded += OnSceneUnloaded;
-		}
-
-		private void OnDestroy()
-		{
-			if (Instance == this)
-			{
-				SceneManager.sceneLoaded -= OnSceneLoaded;
-				SceneManager.sceneUnloaded -= OnSceneUnloaded;
-			}
-		}
-
-		/// <summary>
-		/// This event is subscribed to the Unity change scene event at game core startup
-		/// </summary>
-		/// <param name="scene"></param>
-		/// <param name="mode"></param>
-		private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
-		{
-			MagmaFramework_EventBus.Publish(new SceneLoadedEvent(scene, mode));
-		}
-
-		/// <summary>
-		/// This event is subscribed to the Unity change scene event at game core startup
-		/// </summary>
-		/// <param name="scene"></param>
-		/// <param name="mode"></param>
-		private void OnSceneUnloaded(Scene scene)
-		{
-			MagmaFramework_EventBus.Publish(new SceneUnloadedEvent(scene));
 		}
 
 		/// <summary>
@@ -118,23 +86,6 @@ namespace MagmaFlow.Framework.Core
 		public void SetVSync(VerticalSyncType vSyncType)
 		{
 			QualitySettings.vSyncCount = (int) vSyncType;
-		}
-
-		/// <summary>
-		/// Sets the game's display resolution.
-		/// Only works at runtime.
-		/// </summary>
-		/// <param name="resolution"></param>
-		/// <param name="mode"></param>
-		public void SetScreenResolution(Resolution resolution, FullScreenMode mode)
-		{
-#if UNITY_EDITOR
-			// If we are inside the editor, we don't do anything
-#else
-			Screen.SetResolution(resolution.width, resolution.height, mode, resolution.refreshRateRatio);
-			Debug.Log($"Screen size changed to :: {resolution.width}x{resolution.height} {resolution.refreshRateRatio.value}");
-#endif
-			MagmaFramework_EventBus.Publish(new SetScreenResolutionEvent(resolution, mode));
 		}
 
 		/// <summary>
