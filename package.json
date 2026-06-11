@@ -1,15 +1,20 @@
 {
   "name": "com.magmaflowgames.framework",
   "author": {
-    "name": "Magma Flow Games"
+    "name": "Magma Flow Games",
+    "url": "https://github.com/purpleTurtle08/MagmaFramework",
+    "email": "razvansuciu@magmaflowgames.org"
   },
   "readme": "readme.md",
-  "version": "2.7.6",
+  "version": "2.7.7",
   "displayName": "Magma Framework",
   "description": "A comprehensive framework for building games in Unity; \n- object pooling\n- event management\n- extensions\n- utilities\n- minimal profiling\n\nDocumentation can be found at: https://docs.google.com/document/d/1_v2yFBbT9sble8bZTTgPfpZOcjiiAbKannSIF90Vvc4/edit?usp=sharing",
   "unity": "6000.2",
   "dependencies": {
     "com.unity.addressables": "2.7.4",
     "com.unity.ugui": "2.0.0"
-  }
+  },
+  "documentationUrl": "https://docs.google.com/document/d/1_v2yFBbT9sble8bZTTgPfpZOcjiiAbKannSIF90Vvc4/edit?usp=sharing",
+  "unityRelease": "1f1",
+  "licensesUrl": "https://opensource.org/license/MIT"
 }

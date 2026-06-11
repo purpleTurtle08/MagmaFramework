@@ -12,7 +12,7 @@ Magma Framework is a **Unity framework** built to provide essential, reusable fu
 
 ## 📖 Documentation
 
-Full documentation is available [here](https://docs.google.com/document/d/e/2PACX-1vRjudwI4xmRMmXOKgQH6CA1VQmvLxAO70rtXhQFds0vPjP0iR0zguIednKDQw9OIJy7Nr8BWNEoyUac/pub).
+> For more detailed setup, check the [documentation](https://docs.google.com/document/d/1_v2yFBbT9sble8bZTTgPfpZOcjiiAbKannSIF90Vvc4/edit?usp=sharing).
 
 ## 💡 Why Use Magma Framework
 
@@ -34,4 +34,3 @@ Many Unity projects end up re-implementing common systems like; pooling, event d
 4. Configuring addressable assets (if using the pooling system or InstantiateAddressable() from BaseBehaviour)
 5. Create a 'AssetReferenceDictionaryBuilder' scriptable object that allows retrieving addressable asset references by prefab name.
 6. Open the 'MagmaFramework_Examples' scene, to learn how to use all of the framework's features.
-> For more detailed setup, check the [documentation](https://docs.google.com/document/d/e/2PACX-1vRjudwI4xmRMmXOKgQH6CA1VQmvLxAO70rtXhQFds0vPjP0iR0zguIednKDQw9OIJy7Nr8BWNEoyUac/pub).

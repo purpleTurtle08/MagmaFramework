@@ -6,7 +6,7 @@ using Random = UnityEngine.Random;
 namespace MagmaFlow.Framework.Utils
 {
 	[RequireComponent(typeof(AudioSource))]
-	[DefaultExecutionOrder(-400)]
+	[DefaultExecutionOrder(-5)]
 	public sealed class MagmaFramework_MusicManager : MonoBehaviour
 	{
 		[SerializeField]

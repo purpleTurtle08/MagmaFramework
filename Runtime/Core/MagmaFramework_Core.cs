@@ -57,7 +57,17 @@ namespace MagmaFlow.Framework.Core
 				return;
 			}
 
-			SetupFrameworkCore();
+			SceneManager.sceneLoaded += OnSceneLoaded;
+			SceneManager.sceneUnloaded += OnSceneUnloaded;
+		}
+
+		private void OnDestroy()
+		{
+			if (Instance == this)
+			{
+				SceneManager.sceneLoaded -= OnSceneLoaded;
+				SceneManager.sceneUnloaded -= OnSceneUnloaded;
+			}
 		}
 
 		/// <summary>
@@ -67,7 +77,7 @@ namespace MagmaFlow.Framework.Core
 		/// <param name="mode"></param>
 		private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
 		{
-			MagmaFramework_EventBus.Publish<SceneLoadedEvent>(new SceneLoadedEvent(scene, mode));
+			MagmaFramework_EventBus.Publish(new SceneLoadedEvent(scene, mode));
 		}
 
 		/// <summary>
@@ -77,17 +87,7 @@ namespace MagmaFlow.Framework.Core
 		/// <param name="mode"></param>
 		private void OnSceneUnloaded(Scene scene)
 		{
-			MagmaFramework_EventBus.Publish<SceneUnloadedEvent>(new SceneUnloadedEvent(scene));
-		}
-
-		/// <summary>
-		/// Initializes the game core component.
-		/// <para>Creates a pooledObjectsManager that will persist through scene changes.</para>
-		/// </summary>
-		private void SetupFrameworkCore()
-		{	
-			UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoaded;
-			UnityEngine.SceneManagement.SceneManager.sceneUnloaded += OnSceneUnloaded;
+			MagmaFramework_EventBus.Publish(new SceneUnloadedEvent(scene));
 		}
 
 		/// <summary>
