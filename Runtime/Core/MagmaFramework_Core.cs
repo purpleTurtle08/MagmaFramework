@@ -1,7 +1,6 @@
 ﻿using MagmaFlow.Framework.Events;
 using UnityEditor;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
 namespace MagmaFlow.Framework.Core
 {

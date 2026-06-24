@@ -147,6 +147,7 @@ namespace MagmaFlow.Framework.Pooling
 			MaximumPoolSize = maximumPoolSize >= 0 ? maximumPoolSize : 9999999;
 			var poolRoot = new GameObject("Pooled Objects Container");
 			poolRoot.transform.SetParent(transform);
+			poolRoot.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
 			genericPooledObjectsParent = poolRoot.transform;
 			SceneManager.sceneUnloaded += OnSceneUnload;
 		}

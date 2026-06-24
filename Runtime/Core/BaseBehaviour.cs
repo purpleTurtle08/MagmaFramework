@@ -82,7 +82,6 @@ namespace MagmaFlow.Framework.Core
 		}
 
 		#region Events
-		private bool _isSubscribedToFrameworkEvents = false;
 		/// <summary>
 		/// Fired when MagmaFramework_Core.PauseGame() is called.
 		/// </summary>
@@ -94,9 +93,7 @@ namespace MagmaFlow.Framework.Core
 		}
 		private void Awake()
 		{
-			if (_isSubscribedToFrameworkEvents) return;
 			MagmaFramework_EventBus.Subscribe<GamePausedEvent>(OnGamePaused);
-			_isSubscribedToFrameworkEvents = true;
 		}
 		#endregion Events
 
@@ -257,6 +254,94 @@ namespace MagmaFlow.Framework.Core
 		) where T : UnityEngine.Object
 		{
 			return await InstantiateAddressable<T>(assetReference, new Vector3(0, 0, 0), Quaternion.identity, parent, useWorldSpace);
+		}
+
+		/// <summary>
+		/// Synchronously instantiates an object using an asset reference.
+		/// <para>! WARNING ! This will block the main thread until the asset is loaded and instantiated.</para>
+		/// </summary>
+		protected T InstantiateAddressableSync<T>
+		(
+			AssetReference assetReference,
+			Vector3 position,
+			Quaternion rotation,
+			Transform parent = null,
+			bool useWorldSpace = true
+		) where T : UnityEngine.Object
+		{
+			if (assetReference == null || assetReference.RuntimeKeyIsValid() == false)
+			{
+#if UNITY_EDITOR
+				Debug.LogError("Instantiate addressable called with a null or invalid AssetReference.");
+#endif
+				return null;
+			}
+
+			try
+			{
+				// Start the async operation but immediately force it to complete synchronously
+				var handle = Addressables.InstantiateAsync(assetReference, parent);
+				var instantiatedObject = handle.WaitForCompletion();
+
+				if (instantiatedObject == null)
+				{
+#if UNITY_EDITOR
+					Debug.LogError($"Failed to synchronously instantiate Addressable: {assetReference.editorAsset.name}");
+#endif
+					return null;
+				}
+
+				instantiatedObject.AddComponent<InstantiatedAddressableCleanup>();
+
+				if (!useWorldSpace && parent != null)
+				{
+					instantiatedObject.transform.SetLocalPositionAndRotation(position, rotation);
+				}
+				else
+				{
+					instantiatedObject.transform.SetPositionAndRotation(position, rotation);
+				}
+
+				// User asked for GameObject
+				if (typeof(T) == typeof(GameObject))
+				{
+					return instantiatedObject as T;
+				}
+
+				// User asked for a Component
+				if (typeof(Component).IsAssignableFrom(typeof(T)) &&
+					instantiatedObject.TryGetComponent(typeof(T), out var component))
+				{
+					return component as T;
+				}
+				else
+				{
+					#if UNITY_EDITOR
+					// No matching component found
+					Debug.LogError($"Prefab '{instantiatedObject.name}' does not contain component {typeof(T)}. Performing cleanup");
+					#endif	
+					Destroy(instantiatedObject);
+					return null;
+				}
+			}
+			catch (Exception e)
+			{
+				Debug.LogException(e);
+				return null;
+			}
+		}
+
+		/// <summary>
+		/// Synchronously instantiates an object using an asset reference at the origin.
+		/// </summary>
+		protected T InstantiateAddressableSync<T>
+		(
+			AssetReference assetReference,
+			Transform parent = null,
+			bool useWorldSpace = true
+		) where T : UnityEngine.Object
+		{
+			return InstantiateAddressableSync<T>(assetReference, Vector3.zero, Quaternion.identity, parent, useWorldSpace);
 		}
 
 		#endregion Custom GameObject Creation
