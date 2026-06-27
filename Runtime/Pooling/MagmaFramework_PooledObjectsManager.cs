@@ -12,6 +12,7 @@ namespace MagmaFlow.Framework.Pooling
 {
 	public interface IPoolableObject
 	{	
+		public bool IsAvailable { get; set; }
 		/// <summary>
 		/// Access to the MonoBehaviour attached to this object
 		/// </summary>
@@ -180,15 +181,23 @@ namespace MagmaFlow.Framework.Pooling
 		{
 			if (pooledObject == null) return;
 			var _monoBehaviour = pooledObject.MonoBehaviour;
+			var assetReference = lookUp[pooledObject];
 
 			pooledObject.OnRelease();
 			_monoBehaviour.gameObject.SetActive(false);
 			_monoBehaviour.transform.SetParent(genericPooledObjectsParent);
-			var assetReference = lookUp[pooledObject];
 			if (pool[assetReference].Count >= MaximumPoolSize)
+			{
 				Destroy(_monoBehaviour.gameObject);
+			}
 			else
-				pool[assetReference].Enqueue(pooledObject);
+			{
+				if (!pooledObject.IsAvailable)
+				{
+					pooledObject.IsAvailable = true;
+					pool[assetReference].Enqueue(pooledObject);
+				}
+			}
 		}
 
 		/// <summary>
@@ -421,7 +430,12 @@ namespace MagmaFlow.Framework.Pooling
 				pool[assetReference.RuntimeKey] = queue;
 			}
 
-			IPoolableObject pooledObject = queue.Count > 0 ? queue.Dequeue() : null;
+			IPoolableObject pooledObject = null;
+			if (queue.Count > 0)
+			{
+				pooledObject = queue.Dequeue();
+				pooledObject.IsAvailable = false;
+			}
 
 			if (pooledObject == null || pooledObject.MonoBehaviour == null)
 			{
