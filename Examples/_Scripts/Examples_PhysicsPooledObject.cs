@@ -18,6 +18,8 @@ namespace MagmaFlow.Framework.Examples
 		private float lifeSpan = 3;
 		private float lifetimeLeft;
 
+		bool IPoolableObject.IsAvailable { get; set; }
+
 		private void FixedUpdate()
 		{
 			lifetimeLeft -= Time.fixedDeltaTime;

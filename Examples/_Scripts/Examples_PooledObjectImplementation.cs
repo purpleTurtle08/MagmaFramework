@@ -12,6 +12,8 @@ namespace MagmaFlow.Framework.Examples
 		[SerializeField] private float lifeSpan;
 		private float lifetimeLeft;
 
+		bool IPoolableObject.IsAvailable { get; set; }
+
 		private void Update()
 		{
 			lifetimeLeft -= Time.deltaTime;

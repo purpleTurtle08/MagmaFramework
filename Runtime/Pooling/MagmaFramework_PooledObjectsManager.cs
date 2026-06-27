@@ -12,7 +12,10 @@ namespace MagmaFlow.Framework.Pooling
 {
 	public interface IPoolableObject
 	{	
-		public bool IsAvailable { get; set; }
+		/// <summary>
+		/// Implement this as IPoolableObject.IsAvailable so that the property becomes invisible
+		/// </summary>
+		bool IsAvailable { get; set; }
 		/// <summary>
 		/// Access to the MonoBehaviour attached to this object
 		/// </summary>
