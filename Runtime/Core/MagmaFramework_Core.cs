@@ -1,4 +1,5 @@
 ﻿using MagmaFlow.Framework.Events;
+using MagmaFlow.Framework.Utils;
 using UnityEditor;
 using UnityEngine;
 
@@ -71,9 +72,8 @@ namespace MagmaFlow.Framework.Core
 
 			Instance = this;
 			DontDestroyOnLoad(gameObject);
-#if UNITY_EDITOR
-			Debug.Log($"\u23E9 {name} service registered.");
-#endif
+
+			MagmaUtils.Log($"\u23E9 {name} service registered.");
 			return true;
 		}
 

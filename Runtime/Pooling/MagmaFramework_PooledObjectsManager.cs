@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MagmaFlow.Framework.Utils;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -52,7 +53,7 @@ namespace MagmaFlow.Framework.Pooling
 				var activeCount = lookUp.Count(kv => Equals(kv.Value, key) && kv.Key.MonoBehaviour != null && kv.Key.MonoBehaviour.gameObject.activeSelf);
 				string assetName = "UnknownEntry";
 				assetNames.TryGetValue(key, out assetName);
-				Debug.Log($"[POOL] {assetName} -> {count} -- In Pool ||| {activeCount} -- Active");
+				MagmaUtils.Log($"[POOL] {assetName} -> {count} -- In Pool ||| {activeCount} -- Active");
 			}
 		}
 #endif
@@ -79,16 +80,14 @@ namespace MagmaFlow.Framework.Pooling
 		{
 			if (Instance != null && Instance != this)
 			{
-				//Debug.LogWarning($"Removed {name}, as it is a duplicate. Ensure you only have 1 {name} per scene.");
 				Destroy(gameObject);
 				return false;
 			}
 
 			Instance = this;
 			DontDestroyOnLoad(gameObject);
-#if UNITY_EDITOR
-			Debug.Log($"\u23E9 {name} service registered.");
-#endif
+
+			MagmaUtils.Log($"\u23E9 {name} service registered.");
 			return true;
 		}
 
@@ -213,7 +212,7 @@ namespace MagmaFlow.Framework.Pooling
 		{
 			if (assetReference == null)
 			{
-				Debug.LogError("CreateNewInstance() called with a NULL asset reference.");
+				MagmaUtils.LogError("CreateNewInstance() called with a NULL asset reference.");
 				return null;
 			}
 
@@ -227,17 +226,13 @@ namespace MagmaFlow.Framework.Pooling
 				// Handle early cancellation before continuing
 				if (cancellationToken.IsCancellationRequested)
 				{
-#if UNITY_EDITOR
-					Debug.LogWarning($"Instantiation of {assetReference.editorAsset.name} was cancelled.");
-#endif
+					MagmaUtils.LogWarning($"Instantiation of {assetReference.editorAsset.name} was cancelled.");
 					return null;
 				}
 
 				if(loadedAsset == null)
 				{
-#if UNITY_EDITOR
-					Debug.LogWarning($"There was an issue loading {assetReference.editorAsset.name} asset.");
-#endif
+					MagmaUtils.LogWarning($"There was an issue loading {assetReference.editorAsset.name} asset.");
 					return null;
 				}
 
@@ -246,11 +241,9 @@ namespace MagmaFlow.Framework.Pooling
 				// Verify it implements IPoolableObject
 				if (!instance.TryGetComponent<IPoolableObject>(out var pooledObject))
 				{
-#if UNITY_EDITOR
-					Debug.LogError(
+					MagmaUtils.LogError(
 						$"The prefab '{instance.name}' does not implement IPoolableObject. Cleaning up."
 					);
-#endif
 					Destroy(instance);
 
 					return null;
@@ -271,7 +264,7 @@ namespace MagmaFlow.Framework.Pooling
 			catch (Exception e)
 			{
 
-				Debug.LogException(e);
+				MagmaUtils.LogException(e);
 
 				return null;
 			}
@@ -321,9 +314,7 @@ namespace MagmaFlow.Framework.Pooling
 		{
 			if(!prewarmTokens.TryGetValue(forAsset.RuntimeKey, out var cancellationTokenSource))
 			{
-#if UNITY_EDITOR
-				Debug.LogWarning($"No token present for prewarming {forAsset.editorAsset.name}");
-#endif
+				MagmaUtils.LogWarning($"No token present for prewarming {forAsset.editorAsset.name}");
 				return;
 			}
 
@@ -360,9 +351,7 @@ namespace MagmaFlow.Framework.Pooling
 			}
 			if (currentPool.Count >= count)
 			{
-#if UNITY_EDITOR
-				Debug.Log($"Pre-warm pool {assetReference.editorAsset.name} request ignored, because the pool is already this size or larger!");
-#endif
+				MagmaUtils.Log($"Pre-warm pool {assetReference.editorAsset.name} request ignored, because the pool is already this size or larger!");
 				return;
 			}
 			int difference = count - currentPool.Count;
@@ -372,9 +361,7 @@ namespace MagmaFlow.Framework.Pooling
 
 			try
 			{
-#if UNITY_EDITOR
-				Debug.Log($"Prewarming {difference} {assetReference.editorAsset.name}...");
-#endif
+				MagmaUtils.Log($"Prewarming {difference} {assetReference.editorAsset.name}...");
 				for (int i = 0; i < difference; i++)
 				{
 					if (cts.Token.IsCancellationRequested)
@@ -421,9 +408,7 @@ namespace MagmaFlow.Framework.Pooling
 		{
 			if (assetReference == null)
 			{
-#if UNITY_EDITOR
-				Debug.LogError("The asset reference that you want to instantiate is null.");
-#endif
+				MagmaUtils.LogError("The asset reference that you want to instantiate is null.");
 				return null;
 			}
 
@@ -452,7 +437,7 @@ namespace MagmaFlow.Framework.Pooling
 				catch(Exception e)
 				{
 
-					Debug.LogException(e);
+					MagmaUtils.LogException(e);
 
 				}
 				finally
@@ -522,7 +507,7 @@ namespace MagmaFlow.Framework.Pooling
 		{
 			if(!lookUp.ContainsKey(pooledObject))
 			{
-				Debug.LogError($"The object {pooledObject.MonoBehaviour.name}, that you want to release is not pooled.");
+				MagmaUtils.LogError($"The object {pooledObject.MonoBehaviour.name}, that you want to release is not pooled.");
 				return;
 			}
 
