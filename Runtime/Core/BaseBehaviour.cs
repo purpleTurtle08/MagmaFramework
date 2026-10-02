@@ -14,65 +14,69 @@ namespace MagmaFlow.Framework.Core
 	/// This should replace Unity's MonoBehaviour for an array of extended functionality provided by the MagmaFlow Framework
 	/// </summary>
 	public class BaseBehaviour : MonoBehaviour
-	{
+	{	
+		private WaitForSeconds _delayedInvokeSlep;
+
 		protected MagmaFramework_Core MagmaFramework_Core => MagmaFramework_Core.Instance;
 		protected MagmaFramework_PooledObjectsManager MagmaFramework_PooledObjectsManager => MagmaFramework_PooledObjectsManager.Instance;
 		protected MagmaFramework_MusicManager MagmaFramework_MusicManager => MagmaFramework_MusicManager.Instance;
 
 		/// <summary>
 		/// Finds the closest points (to the sourcePoint) on all colliders that are within the overlap sphere of this sourcePoint.
-		/// <para>! WARNING ! Make sure to exclude this object from the layermask used, when using passThrough = false</para>
 		/// </summary>
-		/// <param name="results">A pre-allocated array to store overlap results (prevents garbage).</param>
+		/// <param name="numberOfPoints">How many points to return.</param>
+		/// <param name="results">A pre-allocated collection to store overlap results.</param>
 		/// <param name="sourcePoint">The center of the overlap sphere.</param>
 		/// <param name="radius">The radius of the overlap sphere.</param>
 		/// <param name="collisionLayerMask">The layers to check against.</param>
 		/// <param name="ignoreTriggers">How to handle trigger colliders.</param>
-		/// <param name="passThrough">Points on colliders that are considered 'backfaces will be ignored'.</param>
+		/// <param name="passThrough">Points on colliders that are considered 'backfaces' will be included.</param>
 		/// <returns>Returns a list of approximate contact points on those colliders.</returns>
-		protected List<Vector3> GetOverlapContactPoints
-		(
-			ref Collider[] results, 
+		protected void GetOverlapContactPoints
+		(	
+			ref List<Vector3> results, 
 			Vector3 sourcePoint, 
-			float radius, 
+			float radius,
+			int numberOfPoints = 4,
 			LayerMask? collisionLayerMask = null, 
 			QueryTriggerInteraction ignoreTriggers = QueryTriggerInteraction.Ignore, 
 			bool passThrough = true
 		)
 		{
 			LayerMask actualMask = collisionLayerMask ?? Physics.AllLayers;
-			int noOfOverlappingColliders = Physics.OverlapSphereNonAlloc(sourcePoint, radius, results, actualMask, ignoreTriggers);
+			Collider[] overlapResult = new Collider[numberOfPoints];
+			int noOfOverlappingColliders = Physics.OverlapSphereNonAlloc(sourcePoint, radius, overlapResult, actualMask, ignoreTriggers);
 
-			if (noOfOverlappingColliders >= results.Length)
+			if (noOfOverlappingColliders >= overlapResult.Length)
 			{
 #if UNITY_EDITOR
 				Debug.LogWarning($"{gameObject.name} ::: Found {noOfOverlappingColliders} overlapping colliders, " +
-								 $"which matches or exceeds the 'results' array size of {results.Length}. " +
+								 $"which matches or exceeds the 'results' array size of {overlapResult.Length}. " +
 								 $"Some colliders may have been missed. Increase the Collider[] results size OR decrease the range, when calling GetOverlapContactPoints().");
 #endif
 			}
 
-			List<Vector3> contactPointsFound = new List<Vector3>();
+			if(results == null) results = new List<Vector3>(numberOfPoints);
 			for (int i = 0; i < noOfOverlappingColliders; i++)
 			{
-				var pointToAdd = results[i].ClosestPoint(sourcePoint);
+				if (overlapResult[i].transform.IsChildOf(transform) || overlapResult[i].transform == transform) continue;
+
+				var pointToAdd = overlapResult[i].ClosestPoint(sourcePoint);
 				if (sourcePoint != pointToAdd)
 				{
 					if (passThrough) 
 					{
-						contactPointsFound.Add(pointToAdd);
+						results.Add(pointToAdd);
 					}
 					else
 					{
 						if(!Physics.Linecast(pointToAdd, sourcePoint, actualMask))
 						{
-							contactPointsFound.Add(pointToAdd);
+							results.Add(pointToAdd);
 						}
 					}
 				}
 			}
-
-			return contactPointsFound;
 		}
 
 		#region Events
@@ -102,13 +106,13 @@ namespace MagmaFlow.Framework.Core
 		/// <param name="childName"></param>
 		/// <returns></returns>
 		protected T GetSubcomponent<T>(Transform origin, string childName) where T : Component
-		{
-			foreach (Transform child in origin)
+		{	
+			for(int i = 0; i < origin.childCount; i++)
 			{
-				if (child.name == childName && child.TryGetComponent(out T comp))
+				if (origin.GetChild(i).name == childName && origin.GetChild(i).TryGetComponent(out T comp))
 					return comp;
 
-				var found = GetSubcomponent<T>(child, childName);
+				var found = GetSubcomponent<T>(origin.GetChild(i), childName);
 				if (found != null) return found;
 			}
 			return default;
@@ -116,18 +120,26 @@ namespace MagmaFlow.Framework.Core
 
 		/// <summary>
 		/// Invokes an action after with a delay.
+		/// It uses scaled time and callback won't fire if the object dies.
 		/// </summary>
 		/// <param name="action"></param>
 		/// <param name="delay"></param>
 		/// <returns>Returns the coroutine that handles the invoking.</returns>
-		protected Coroutine Invoke(Action action, float delay = 0)
-		{
+		protected Coroutine InvokeDelayed(Action action, float delay = 0)
+		{	
+			if(delay <= 0)
+			{
+				action?.Invoke();
+				return null;
+			}
+
+			_delayedInvokeSlep = new WaitForSeconds(delay);
 			return StartCoroutine(InvokeInternal(action, delay));
 		}
 
 		private IEnumerator InvokeInternal(Action action, float delay)
 		{
-			yield return new WaitForSeconds(delay);
+			yield return _delayedInvokeSlep;
 			action?.Invoke();
 		}
 
@@ -181,7 +193,7 @@ namespace MagmaFlow.Framework.Core
 
 			try
 			{
-				var instantiatedObject = await Addressables.InstantiateAsync(assetReference, parent).Task;
+				var instantiatedObject = await Addressables.InstantiateAsync(assetReference, position, rotation, parent).Task;
 				if (instantiatedObject == null)
 				{
 #if UNITY_EDITOR
@@ -274,7 +286,7 @@ namespace MagmaFlow.Framework.Core
 			try
 			{
 				// Start the async operation but immediately force it to complete synchronously
-				var handle = Addressables.InstantiateAsync(assetReference, parent);
+				var handle = Addressables.InstantiateAsync(assetReference, position, rotation, parent);
 				var instantiatedObject = handle.WaitForCompletion();
 
 				if (instantiatedObject == null)

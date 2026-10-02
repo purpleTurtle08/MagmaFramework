@@ -18,11 +18,11 @@ namespace MagmaFlow.Framework.Examples
 		private void Start()
 		{
 			//You can store a an Invoke() as a coroutine (maybe for situational stopping: StopCoroutine(greetingsRoutine);
-			Coroutine greetingsRoutine = Invoke(GreetingOnStart, 3);
+			Coroutine greetingsRoutine = InvokeDelayed(GreetingOnStart, 3);
 			//Or if you don't want to manage a coroutine, you can simply not store it
-			Invoke(GreetingOnStart, 3);
+			InvokeDelayed(GreetingOnStart, 3);
 			//Or Invoking without any delay (not sure why you'd do that)
-			Invoke(GreetingOnStart);
+			InvokeDelayed(GreetingOnStart);
 
 			//This will attempt to get a subcomponent from a child with any depth, based on its NAME
 			var subComponent = GetSubcomponent<Transform>(transform, "nameOfTheChild");
