@@ -54,7 +54,7 @@ namespace MagmaFlow.Framework.Core
 			if (s_overlapBuffer.Length < numberOfPoints) s_overlapBuffer = new Collider[numberOfPoints]; // grows once, never per call
 
 			int actualMask = collisionLayerMask ?? Physics.AllLayers;
-			int noOfOverlappingColliders = Physics.OverlapSphereNonAlloc(sourcePoint, radius, s_overlapBuffer, mask, ignoreTriggers);
+			int noOfOverlappingColliders = Physics.OverlapSphereNonAlloc(sourcePoint, radius, s_overlapBuffer, actualMask, ignoreTriggers);
 
 			if (noOfOverlappingColliders >= _overlapResult.Length)
 			{
