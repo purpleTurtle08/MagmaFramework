@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
+using UnityEngine.ResourceManagement.AsyncOperations;
 
 namespace MagmaFlow.Framework.Core
 {	
@@ -14,70 +15,92 @@ namespace MagmaFlow.Framework.Core
 	/// This should replace Unity's MonoBehaviour for an array of extended functionality provided by the MagmaFlow Framework
 	/// </summary>
 	public class BaseBehaviour : MonoBehaviour
-	{	
-		private WaitForSeconds _delayedInvokeSlep;
+	{
+		// Shared by all BaseBehaviours. Safe because Physics queries are main-thread only and these methods don't re-enter.
+		private static Collider[] s_overlapBuffer = new Collider[16];
+		private static readonly RaycastHit[] s_lineOfSightHits = new RaycastHit[16];
 
 		protected MagmaFramework_Core MagmaFramework_Core => MagmaFramework_Core.Instance;
 		protected MagmaFramework_PooledObjectsManager MagmaFramework_PooledObjectsManager => MagmaFramework_PooledObjectsManager.Instance;
 		protected MagmaFramework_MusicManager MagmaFramework_MusicManager => MagmaFramework_MusicManager.Instance;
 
+		private Collider[] _overlapResult;
+		private readonly RaycastHit[] _lineOfSightHits = new RaycastHit[16];
+
+		#region Get overlap points
+
 		/// <summary>
 		/// Finds the closest points (to the sourcePoint) on all colliders that are within the overlap sphere of this sourcePoint.
+		/// <para>Colliders on this object and its children are always ignored.</para>
 		/// </summary>
-		/// <param name="numberOfPoints">How many points to return.</param>
-		/// <param name="results">A pre-allocated collection to store overlap results.</param>
+		/// <param name="results">Points are appended to this list.</param>
 		/// <param name="sourcePoint">The center of the overlap sphere.</param>
 		/// <param name="radius">The radius of the overlap sphere.</param>
+		/// <param name="numberOfPoints">Maximum number of colliders to check.</param>
 		/// <param name="collisionLayerMask">The layers to check against.</param>
 		/// <param name="ignoreTriggers">How to handle trigger colliders.</param>
-		/// <param name="passThrough">Points on colliders that are considered 'backfaces' will be included.</param>
-		/// <returns>Returns a list of approximate contact points on those colliders.</returns>
+		/// <param name="passThrough">If false, points hidden behind other colliders are discarded.</param>
 		protected void GetOverlapContactPoints
-		(	
-			ref List<Vector3> results, 
-			Vector3 sourcePoint, 
+		(
+			ref List<Vector3> results,
+			Vector3 sourcePoint,
 			float radius,
 			int numberOfPoints = 4,
-			LayerMask? collisionLayerMask = null, 
-			QueryTriggerInteraction ignoreTriggers = QueryTriggerInteraction.Ignore, 
+			LayerMask? collisionLayerMask = null,
+			QueryTriggerInteraction ignoreTriggers = QueryTriggerInteraction.Ignore,
 			bool passThrough = true
 		)
 		{
-			LayerMask actualMask = collisionLayerMask ?? Physics.AllLayers;
-			Collider[] overlapResult = new Collider[numberOfPoints];
-			int noOfOverlappingColliders = Physics.OverlapSphereNonAlloc(sourcePoint, radius, overlapResult, actualMask, ignoreTriggers);
+			if (s_overlapBuffer.Length < numberOfPoints) s_overlapBuffer = new Collider[numberOfPoints]; // grows once, never per call
 
-			if (noOfOverlappingColliders >= overlapResult.Length)
+			int actualMask = collisionLayerMask ?? Physics.AllLayers;
+			int noOfOverlappingColliders = Physics.OverlapSphereNonAlloc(sourcePoint, radius, s_overlapBuffer, mask, ignoreTriggers);
+
+			if (noOfOverlappingColliders >= _overlapResult.Length)
 			{
-#if UNITY_EDITOR
-				Debug.LogWarning($"{gameObject.name} ::: Found {noOfOverlappingColliders} overlapping colliders, " +
-								 $"which matches or exceeds the 'results' array size of {overlapResult.Length}. " +
-								 $"Some colliders may have been missed. Increase the Collider[] results size OR decrease the range, when calling GetOverlapContactPoints().");
-#endif
+				MagmaUtils.LogWarning($"{gameObject.name} ::: Found {noOfOverlappingColliders} overlapping colliders, " +
+								 $"which fills the buffer of {_overlapResult.Length}. Some colliders may have been missed. " +
+								 $"Increase numberOfPoints OR decrease the radius when calling GetOverlapContactPoints().");
 			}
 
-			if(results == null) results = new List<Vector3>(numberOfPoints);
+			if (results == null) results = new List<Vector3>(numberOfPoints);
 			for (int i = 0; i < noOfOverlappingColliders; i++)
 			{
-				if (overlapResult[i].transform.IsChildOf(transform) || overlapResult[i].transform == transform) continue;
+				Collider target = _overlapResult[i];
+				if (IsOwnCollider(target)) continue;
 
-				var pointToAdd = overlapResult[i].ClosestPoint(sourcePoint);
-				if (sourcePoint != pointToAdd)
+				Vector3 pointToAdd = target.ClosestPoint(sourcePoint);
+				if (sourcePoint == pointToAdd) continue;
+
+				if (passThrough || HasLineOfSight(pointToAdd, sourcePoint, target, actualMask, ignoreTriggers))
 				{
-					if (passThrough) 
-					{
-						results.Add(pointToAdd);
-					}
-					else
-					{
-						if(!Physics.Linecast(pointToAdd, sourcePoint, actualMask))
-						{
-							results.Add(pointToAdd);
-						}
-					}
+					results.Add(pointToAdd);
 				}
 			}
 		}
+
+		/// <summary>
+		/// True if nothing except this object's own colliders and the target itself lies between the two points.
+		/// </summary>
+		private bool HasLineOfSight(Vector3 from, Vector3 to, Collider target, int mask, QueryTriggerInteraction triggers)
+		{
+			Vector3 delta = to - from;
+			float distance = delta.magnitude;
+			if (distance <= Mathf.Epsilon) return true;
+
+			int hits = Physics.RaycastNonAlloc(from, delta / distance, _lineOfSightHits, distance, mask, triggers);
+			for (int h = 0; h < hits; h++)
+			{
+				Collider hit = _lineOfSightHits[h].collider;
+				if (hit == target || IsOwnCollider(hit)) continue;
+				return false; // Something else is in the way.
+			}
+			return true;
+		}
+
+		private bool IsOwnCollider(Collider c) => c.transform.IsChildOf(transform);
+
+		#endregion Get overlap points
 
 		#region Events
 		/// <summary>
@@ -133,13 +156,12 @@ namespace MagmaFlow.Framework.Core
 				return null;
 			}
 
-			_delayedInvokeSlep = new WaitForSeconds(delay);
 			return StartCoroutine(InvokeInternal(action, delay));
 		}
 
 		private IEnumerator InvokeInternal(Action action, float delay)
 		{
-			yield return _delayedInvokeSlep;
+			yield return new WaitForSeconds(delay);
 			action?.Invoke();
 		}
 
@@ -159,90 +181,11 @@ namespace MagmaFlow.Framework.Core
 			GameObject newObject = new GameObject(name);
 			if (parent != null)
 			{
-				newObject.transform.SetParent(parent);
+				newObject.transform.SetParent(parent, false);
 			}
 			return newObject.AddComponent<T>();
 		}
 
-		/// <summary>
-		/// Instantiates an object using an asset refference.
-		/// </summary>
-		/// <typeparam name="T"></typeparam>
-		/// <param name="assetReference"></param>
-		/// <param name="position"></param>
-		/// <param name="rotation"></param>
-		/// <param name="parent"></param>
-		/// <param name="useWorldSpace"></param>
-		/// <returns></returns>
-		protected async Task<T> InstantiateAddressable<T>
-		(
-			AssetReference assetReference,
-			Vector3 position,
-			Quaternion rotation,
-			Transform parent = null,
-			bool useWorldSpace = true
-		) where T : UnityEngine.Object
-		{
-			if (assetReference == null || assetReference.RuntimeKeyIsValid() == false)
-			{
-#if UNITY_EDITOR
-				Debug.LogError("Instantiate addressable called with a null or invalid AssetReference.");
-#endif
-				return null;
-			}
-
-			try
-			{
-				var instantiatedObject = await Addressables.InstantiateAsync(assetReference, position, rotation, parent).Task;
-				if (instantiatedObject == null)
-				{
-#if UNITY_EDITOR
-					// This can happen if the operation is cancelled or fails
-					Debug.LogError($"Failed to instantiate Addressable: {assetReference.editorAsset.name}");
-#endif
-					return null;
-				}
-
-				instantiatedObject.AddComponent<InstantiatedAddressableCleanup>();
-
-				if (!useWorldSpace && parent != null)
-				{
-					instantiatedObject.transform.SetLocalPositionAndRotation(position, rotation);
-				}
-				else
-				{
-					instantiatedObject.transform.SetPositionAndRotation(position, rotation);
-				}
-
-				// User asked for GameObject
-				if (typeof(T) == typeof(GameObject))
-				{
-					return instantiatedObject as T;
-				}
-
-				//User asked for a Component
-				if (typeof(Component).IsAssignableFrom(typeof(T)) &&
-					instantiatedObject.TryGetComponent(typeof(T), out var component))
-				{
-					return component as T;
-				}
-				else
-				{
-#if UNITY_EDITOR
-					// No matching component found
-					Debug.LogError($"Prefab '{instantiatedObject.name}' does not contain component {typeof(T)}. Performing cleanup");
-#endif	
-					Destroy(instantiatedObject);
-					return null;
-				}
-			}
-			catch (Exception e)
-			{
-				// Handle exceptions during the async operation
-				Debug.LogException(e);
-				return null;
-			}
-		}
 
 		/// <summary>
 		/// Instantiates an object using an asset refference.
@@ -263,81 +206,6 @@ namespace MagmaFlow.Framework.Core
 		}
 
 		/// <summary>
-		/// Synchronously instantiates an object using an asset reference.
-		/// <para>! WARNING ! This will block the main thread until the asset is loaded and instantiated.</para>
-		/// </summary>
-		protected T InstantiateAddressableSync<T>
-		(
-			AssetReference assetReference,
-			Vector3 position,
-			Quaternion rotation,
-			Transform parent = null,
-			bool useWorldSpace = true
-		) where T : UnityEngine.Object
-		{
-			if (assetReference == null || assetReference.RuntimeKeyIsValid() == false)
-			{
-#if UNITY_EDITOR
-				Debug.LogError("Instantiate addressable called with a null or invalid AssetReference.");
-#endif
-				return null;
-			}
-
-			try
-			{
-				// Start the async operation but immediately force it to complete synchronously
-				var handle = Addressables.InstantiateAsync(assetReference, position, rotation, parent);
-				var instantiatedObject = handle.WaitForCompletion();
-
-				if (instantiatedObject == null)
-				{
-#if UNITY_EDITOR
-					Debug.LogError($"Failed to synchronously instantiate Addressable: {assetReference.editorAsset.name}");
-#endif
-					return null;
-				}
-
-				instantiatedObject.AddComponent<InstantiatedAddressableCleanup>();
-
-				if (!useWorldSpace && parent != null)
-				{
-					instantiatedObject.transform.SetLocalPositionAndRotation(position, rotation);
-				}
-				else
-				{
-					instantiatedObject.transform.SetPositionAndRotation(position, rotation);
-				}
-
-				// User asked for GameObject
-				if (typeof(T) == typeof(GameObject))
-				{
-					return instantiatedObject as T;
-				}
-
-				// User asked for a Component
-				if (typeof(Component).IsAssignableFrom(typeof(T)) &&
-					instantiatedObject.TryGetComponent(typeof(T), out var component))
-				{
-					return component as T;
-				}
-				else
-				{
-					#if UNITY_EDITOR
-					// No matching component found
-					Debug.LogError($"Prefab '{instantiatedObject.name}' does not contain component {typeof(T)}. Performing cleanup");
-					#endif	
-					Destroy(instantiatedObject);
-					return null;
-				}
-			}
-			catch (Exception e)
-			{
-				Debug.LogException(e);
-				return null;
-			}
-		}
-
-		/// <summary>
 		/// Synchronously instantiates an object using an asset reference at the origin.
 		/// </summary>
 		protected T InstantiateAddressableSync<T>
@@ -350,6 +218,115 @@ namespace MagmaFlow.Framework.Core
 			return InstantiateAddressableSync<T>(assetReference, Vector3.zero, Quaternion.identity, parent, useWorldSpace);
 		}
 
+		protected async Task<T> InstantiateAddressable<T>
+		(
+			AssetReference assetReference,
+			Vector3 position,
+			Quaternion rotation,
+			Transform parent = null,
+			bool useWorldSpace = true
+		) where T : UnityEngine.Object
+		{
+			if (assetReference == null || !assetReference.RuntimeKeyIsValid())
+			{
+				MagmaUtils.LogError($"{name} ::: InstantiateAddressable called with a null or invalid AssetReference.");
+				return null;
+			}
+
+			try
+			{
+				ToWorldPose(ref position, ref rotation, parent, useWorldSpace);
+				var handle = Addressables.InstantiateAsync(assetReference, position, rotation, parent);
+				await handle.Task;
+				return FinalizeInstance<T>(handle, assetReference);
+			}
+			catch (Exception e)
+			{
+				MagmaUtils.LogException(e);
+				return null;
+			}
+		}
+
+		protected T InstantiateAddressableSync<T>
+		(
+			AssetReference assetReference,
+			Vector3 position,
+			Quaternion rotation,
+			Transform parent = null,
+			bool useWorldSpace = true
+		) where T : UnityEngine.Object
+		{
+			if (assetReference == null || !assetReference.RuntimeKeyIsValid())
+			{
+				MagmaUtils.LogError($"{name} ::: InstantiateAddressableSync called with a null or invalid AssetReference.");
+				return null;
+			}
+
+			try
+			{
+				ToWorldPose(ref position, ref rotation, parent, useWorldSpace);
+				var handle = Addressables.InstantiateAsync(assetReference, position, rotation, parent);
+				handle.WaitForCompletion();
+				return FinalizeInstance<T>(handle, assetReference);
+			}
+			catch (Exception e)
+			{
+				MagmaUtils.LogException(e);
+				return null;
+			}
+		}
+
 		#endregion Custom GameObject Creation
+
+		/// <summary>
+		/// Shared post-instantiation step for InstantiateAddressable / InstantiateAddressableSync.
+		/// Validates the operation, attaches the release-on-destroy component and resolves the requested type.
+		/// <para>On any failure the instance (if one was created) is released and null is returned.</para>
+		/// </summary>
+		private T FinalizeInstance<T>(AsyncOperationHandle<GameObject> handle, AssetReference assetReference) where T : UnityEngine.Object
+		{
+			if (handle.Status != AsyncOperationStatus.Succeeded || handle.Result == null)
+			{
+				MagmaUtils.LogError($"{name} ::: Failed to instantiate Addressable '{assetReference.AssetGUID}'. {handle.OperationException}");
+				if (handle.IsValid()) Addressables.Release(handle);
+				return null;
+			}
+
+			// The caller was destroyed while the asset was loading; nobody will own this instance.
+			if (this == null)
+			{
+				Addressables.ReleaseInstance(handle);
+				return null;
+			}
+
+			GameObject instance = handle.Result;
+
+			// Must be added before any Destroy() below, so destroying the instance also releases it.
+			instance.AddComponent<InstantiatedAddressableCleanup>();
+
+			if (typeof(T) == typeof(GameObject))
+			{
+				return instance as T;
+			}
+
+			if (typeof(Component).IsAssignableFrom(typeof(T)) && instance.TryGetComponent(typeof(T), out var component))
+			{
+				return component as T;
+			}
+
+			MagmaUtils.LogError($"{name} ::: Prefab '{instance.name}' does not contain a {typeof(T).Name}. Destroying the instance.");
+			Destroy(instance);
+			return null;
+		}
+
+		/// <summary>
+		/// Converts a pose to world space when it was given relative to the parent.
+		/// </summary>
+		private static void ToWorldPose(ref Vector3 position, ref Quaternion rotation, Transform parent, bool useWorldSpace)
+		{
+			if (useWorldSpace || parent == null) return;
+			position = parent.TransformPoint(position);
+			rotation = parent.rotation * rotation;
+		}
 	}
 }

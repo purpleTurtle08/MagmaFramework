@@ -1,13 +1,14 @@
 using MagmaFlow.Framework.Core;
 using MagmaFlow.Framework.Events;
 using MagmaFlow.Framework.Pooling;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace MagmaFlow.Framework.Examples
 {
 	public class Examples_BaseBehaviourImplementation : BaseBehaviour
 	{
-		private Collider[] overlappingCollidersRef = new Collider[15];
+		private List<Vector3> overlappingCollidersRef;
 
 		[Header("Get Overlap Contact Points Parameters")]
 		[Range(1, 100)] public float Range = 3;
@@ -50,9 +51,9 @@ namespace MagmaFlow.Framework.Examples
 		private async void DisplayOverlapContactPoints()
 		{
 			//We get the list of points on the colliders in range
-			var contactPoints = GetOverlapContactPoints(ref overlappingCollidersRef, transform.position, Range, passThrough: PassThrough);
+			GetOverlapContactPoints(ref overlappingCollidersRef, transform.position, Range, 15, passThrough: PassThrough);
 			//We instantiate a prefab at each of those points, for a visual feedback
-			foreach (var contactPoint in contactPoints)
+			foreach (var contactPoint in overlappingCollidersRef)
 			{
 				//awaited pooled object instantiation
 				await MagmaFramework_PooledObjectsManager.InstantiatePooledObject<Examples_PooledObjectImplementation>(assets.GetAssetReference("ContactPoint"), contactPoint, Quaternion.identity);
