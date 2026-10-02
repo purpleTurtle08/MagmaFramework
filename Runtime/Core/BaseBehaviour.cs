@@ -40,11 +40,6 @@ namespace MagmaFlow.Framework.Core
 			bool passThrough = true
 		)
 		{
-			if (TryGetComponent<Collider>(out var thisCollider))
-			{
-				thisCollider.enabled = false;
-			}
-
 			LayerMask actualMask = collisionLayerMask ?? Physics.AllLayers;
 			int noOfOverlappingColliders = Physics.OverlapSphereNonAlloc(sourcePoint, radius, results, actualMask, ignoreTriggers);
 
@@ -77,7 +72,6 @@ namespace MagmaFlow.Framework.Core
 				}
 			}
 
-			if(thisCollider != null) thisCollider.enabled = true;
 			return contactPointsFound;
 		}
 
@@ -87,11 +81,11 @@ namespace MagmaFlow.Framework.Core
 		/// </summary>
 		/// <param name="eventData"></param>
 		protected virtual void OnGamePaused(GamePausedEvent eventData) { }
-		private void OnDestroy()
+		protected virtual void OnDestroy()
 		{
 			MagmaFramework_EventBus.Unsubscribe<GamePausedEvent>(OnGamePaused);
 		}
-		private void Awake()
+		protected virtual void Awake()
 		{
 			MagmaFramework_EventBus.Subscribe<GamePausedEvent>(OnGamePaused);
 		}
