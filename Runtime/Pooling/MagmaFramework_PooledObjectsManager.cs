@@ -132,6 +132,10 @@ namespace MagmaFlow.Framework.Pooling
 		/// </summary>
 		private readonly Dictionary<object, string> assetNames = new();
 		/// <summary>
+		/// The prefab's local scale per asset key, restored on every spawn.
+		/// </summary>
+		private readonly Dictionary<object, Vector3> prefabScales = new();
+		/// <summary>
 		/// This helps handling possible simultaneous prewarm operations
 		/// </summary>
 		private readonly HashSet<object> currentlyPrewarming = new();
@@ -275,7 +279,8 @@ namespace MagmaFlow.Framework.Pooling
 
 			var _monoBehaviour = pooledObject.MonoBehaviour;
 			_monoBehaviour.gameObject.SetActive(false);
-			_monoBehaviour.transform.SetParent(genericPooledObjectsParent);
+			// The pose is reset on the next spawn, so there's no need to preserve it
+			_monoBehaviour.transform.SetParent(genericPooledObjectsParent, false);
 
 			var queue = GetOrCreatePool(assetKey);
 			if (queue.Count >= MaximumPoolSize)
@@ -339,6 +344,7 @@ namespace MagmaFlow.Framework.Pooling
 				{
 					assetNames[assetKey] = loadedAsset.name;
 				}
+				prefabScales[assetKey] = loadedAsset.transform.localScale;
 
 				// Created under an inactive parent, so Awake / OnEnable wait until the object is actually spawned
 				var instance = Instantiate(loadedAsset, inactiveStagingParent);
@@ -507,6 +513,7 @@ namespace MagmaFlow.Framework.Pooling
 		/// <summary>
 		/// Instantiates or retrieves a pooled object and returns the component of type T.
 		/// Can only be called from the main thread.
+		/// <para>Scale behaves like Instantiate(prefab, parent): the prefab's scale is restored on every spawn and the parent's scale is inherited.</para>
 		/// </summary>
 		/// <typeparam name="T"></typeparam>
 		/// <param name="assetReference"></param>
@@ -573,8 +580,21 @@ namespace MagmaFlow.Framework.Pooling
 			}
 
 			var objTransform = pooledObject.MonoBehaviour.transform;
-			objTransform.SetParent(parent != null ? parent : genericPooledObjectsParent);
 
+			if (!objTransform.TryGetComponent<T>(out var component))
+			{
+				MagmaUtils.LogError($"{LOG_PREFIX}{GetAssetName(assetReference)} does not have a component of type {typeof(T).Name} assigned.");
+				ReturnToPool(pooledObject);
+				return null;
+			}
+
+			// Like Instantiate(prefab, parent): start from the prefab's scale and inherit the parent's,
+			// so scale changes made during a previous use don't carry over.
+			if (prefabScales.TryGetValue(assetReference.RuntimeKey, out var prefabScale))
+			{
+				objTransform.localScale = prefabScale;
+			}
+			objTransform.SetParent(parent != null ? parent : genericPooledObjectsParent, false);
 			if (!useWorldSpace && parent != null)
 			{
 				objTransform.SetLocalPositionAndRotation(position, rotation);
@@ -587,7 +607,7 @@ namespace MagmaFlow.Framework.Pooling
 			objTransform.gameObject.SetActive(true);
 			pooledObject.OnInitialize();
 
-			return objTransform.GetComponent<T>();
+			return component;
 		}
 
 		/// <summary>
@@ -631,6 +651,20 @@ namespace MagmaFlow.Framework.Pooling
 		/// <param name="pooledObject"></param>
 		public void ReleaseObject(IPoolableObject pooledObject)
 		{
+			if (pooledObject is null)
+			{
+				MagmaUtils.LogError($"{LOG_PREFIX}ReleaseObject() called with a NULL object.");
+				return;
+			}
+
+			// Destroyed elsewhere (e.g. with its parent's scene): nothing to return, just drop any stale entry
+			if (pooledObject.MonoBehaviour == null)
+			{
+				lookUp.Remove(pooledObject);
+				MagmaUtils.LogWarning($"{LOG_PREFIX}ReleaseObject() called on a destroyed object. Ignoring the release.");
+				return;
+			}
+
 			if (!lookUp.ContainsKey(pooledObject))
 			{
 				MagmaUtils.LogError($"{LOG_PREFIX}The object {pooledObject.MonoBehaviour.name}, that you want to release is not pooled.");
@@ -658,6 +692,8 @@ namespace MagmaFlow.Framework.Pooling
 			CancelAllPrewarmOperations();
 			CancelAllInstantiateOperation();
 
+			// Blocks RemoveLookup(), since we clear the lookup ourselves below.
+			// (Destroy is deferred to the end of the frame anyway, so PooledInstanceCleanup's OnDestroy runs after this method.)
 			isClearing = true;
 
 			// Destroy all INACTIVE objects (in the queues)
@@ -668,15 +704,14 @@ namespace MagmaFlow.Framework.Pooling
 					var pooledObject = queue.Dequeue();
 					if (pooledObject != null && pooledObject.MonoBehaviour != null)
 					{
-						// This will NOT trigger PooledInstanceCleanup because
-						// the object is not in the 'lookUp' dictionary.
 						Destroy(pooledObject.MonoBehaviour.gameObject);
 					}
 				}
 			}
 			pool.Clear();
 
-
+			// The lookup holds every instance, so this covers the ACTIVE ones.
+			// Queued objects are hit a second time, which is harmless (Destroy on an already destroyed object is ignored).
 			foreach (var pooledObject in lookUp.Keys)
 			{
 				if (pooledObject != null && pooledObject.MonoBehaviour != null)
@@ -685,8 +720,6 @@ namespace MagmaFlow.Framework.Pooling
 				}
 			}
 
-			// By now, PooledInstanceCleanup should have cleared the lookup.
-			// We clear it just in case of any stragglers.
 			lookUp.Clear();
 
 			if (releaseAllLoadedAssets)
@@ -698,6 +731,7 @@ namespace MagmaFlow.Framework.Pooling
 				}
 				loadedAssets.Clear();
 				assetNames.Clear();
+				prefabScales.Clear();
 			}
 
 			isClearing = false;
