@@ -4,6 +4,7 @@ using MagmaFlow.Framework.Utils;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
@@ -17,15 +18,15 @@ namespace MagmaFlow.Framework.Core
 	public class BaseBehaviour : MonoBehaviour
 	{
 		// Shared by all BaseBehaviours. Safe because Physics queries are main-thread only and these methods don't re-enter.
-		private static Collider[] s_overlapBuffer = new Collider[16];
-		private static readonly RaycastHit[] s_lineOfSightHits = new RaycastHit[16];
+		// Created on first use, so a BaseBehaviour that never calls GetOverlapContactPoints() costs nothing.
+		private static Collider[] s_overlapBuffer;
+		private static RaycastHit[] s_lineOfSightHits;
 
 		protected MagmaFramework_Core MagmaFramework_Core => MagmaFramework_Core.Instance;
 		protected MagmaFramework_PooledObjectsManager MagmaFramework_PooledObjectsManager => MagmaFramework_PooledObjectsManager.Instance;
 		protected MagmaFramework_MusicManager MagmaFramework_MusicManager => MagmaFramework_MusicManager.Instance;
 
 		private Collider[] _overlapResult;
-		private readonly RaycastHit[] _lineOfSightHits = new RaycastHit[16];
 
 		#region Get overlap points
 
@@ -51,7 +52,8 @@ namespace MagmaFlow.Framework.Core
 			bool passThrough = true
 		)
 		{
-			if (s_overlapBuffer.Length < numberOfPoints) s_overlapBuffer = new Collider[numberOfPoints]; // grows once, never per call
+			// Grows only when a caller asks for more than any previous one, never per call
+			if (s_overlapBuffer == null || s_overlapBuffer.Length < numberOfPoints) s_overlapBuffer = new Collider[numberOfPoints];
 
 			int actualMask = collisionLayerMask ?? Physics.AllLayers;
 			int noOfOverlappingColliders = Physics.OverlapSphereNonAlloc(sourcePoint, radius, s_overlapBuffer, actualMask, ignoreTriggers);
@@ -88,10 +90,11 @@ namespace MagmaFlow.Framework.Core
 			float distance = delta.magnitude;
 			if (distance <= Mathf.Epsilon) return true;
 
-			int hits = Physics.RaycastNonAlloc(from, delta / distance, _lineOfSightHits, distance, mask, triggers);
+			s_lineOfSightHits ??= new RaycastHit[16];
+			int hits = Physics.RaycastNonAlloc(from, delta / distance, s_lineOfSightHits, distance, mask, triggers);
 			for (int h = 0; h < hits; h++)
 			{
-				Collider hit = _lineOfSightHits[h].collider;
+				Collider hit = s_lineOfSightHits[h].collider;
 				if (hit == target || IsOwnCollider(hit)) continue;
 				return false; // Something else is in the way.
 			}
@@ -103,19 +106,48 @@ namespace MagmaFlow.Framework.Core
 		#endregion Get overlap points
 
 		#region Events
+
+		// Per concrete type: does it override OnGamePaused()? Resolved once per type, then cached.
+		private static readonly Dictionary<Type, bool> s_overridesOnGamePaused = new();
+		private static readonly Type[] s_onGamePausedSignature = { typeof(GamePausedEvent) };
+
+		private bool isSubscribedToGamePaused;
+
 		/// <summary>
 		/// Fired when MagmaFramework_Core.PauseGame() is called.
+		/// <para>Only objects whose class overrides this method are subscribed, so the rest cost nothing.</para>
+		/// <para>If you override Awake() / OnDestroy(), call base.Awake() / base.OnDestroy(), or this won't be received / unsubscribed.</para>
 		/// </summary>
 		/// <param name="eventData"></param>
 		protected virtual void OnGamePaused(GamePausedEvent eventData) { }
 		protected virtual void OnDestroy()
 		{
-			MagmaFramework_EventBus.Unsubscribe<GamePausedEvent>(OnGamePaused);
+			if (isSubscribedToGamePaused)
+			{
+				MagmaFramework_EventBus.Unsubscribe<GamePausedEvent>(OnGamePaused);
+				isSubscribedToGamePaused = false;
+			}
 		}
 		protected virtual void Awake()
 		{
-			MagmaFramework_EventBus.Subscribe<GamePausedEvent>(OnGamePaused);
+			if (OverridesOnGamePaused(GetType()))
+			{
+				MagmaFramework_EventBus.Subscribe<GamePausedEvent>(OnGamePaused);
+				isSubscribedToGamePaused = true;
+			}
 		}
+		private static bool OverridesOnGamePaused(Type type)
+		{
+			if (!s_overridesOnGamePaused.TryGetValue(type, out bool overrides))
+			{
+				// Returns the most derived override, so an override in an intermediate base class counts too
+				var method = type.GetMethod(nameof(OnGamePaused), BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, s_onGamePausedSignature, null);
+				overrides = method != null && method.DeclaringType != typeof(BaseBehaviour);
+				s_overridesOnGamePaused[type] = overrides;
+			}
+			return overrides;
+		}
+
 		#endregion Events
 
 		#region Essentials
