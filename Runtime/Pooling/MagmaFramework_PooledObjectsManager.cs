@@ -12,7 +12,7 @@ using UnityEngine.SceneManagement;
 namespace MagmaFlow.Framework.Pooling
 {
 	public interface IPoolableObject
-	{	
+	{
 		/// <summary>
 		/// Implement this as IPoolableObject.IsAvailable so that the property becomes invisible
 		/// </summary>
@@ -51,8 +51,10 @@ namespace MagmaFlow.Framework.Pooling
 				var key = keyValue.Key;
 				var count = keyValue.Value.Count;
 				var activeCount = lookUp.Count(kv => Equals(kv.Value, key) && kv.Key.MonoBehaviour != null && kv.Key.MonoBehaviour.gameObject.activeSelf);
-				string assetName = "UnknownEntry";
-				assetNames.TryGetValue(key, out assetName);
+				if (!assetNames.TryGetValue(key, out var assetName))
+				{
+					assetName = "UnknownEntry";
+				}
 				MagmaUtils.Log($"[POOL] {assetName} -> {count} -- In Pool ||| {activeCount} -- Active");
 			}
 		}
@@ -142,6 +144,49 @@ namespace MagmaFlow.Framework.Pooling
 		}
 
 		/// <summary>
+		/// Returns a readable name for an AssetReference that is safe to call in both the Editor and builds.
+		/// <para>Editor: the editor asset's name.</para>
+		/// <para>Builds: the cached prefab name if the asset has been loaded by this manager,
+		/// otherwise the loaded asset's name, otherwise the asset GUID.</para>
+		/// </summary>
+		/// <param name="assetReference"></param>
+		/// <returns></returns>
+		public string GetAssetName(AssetReference assetReference)
+		{
+			if (assetReference == null)
+				return "NULL AssetReference";
+
+#if UNITY_EDITOR
+			var editorAsset = assetReference.editorAsset;
+			if (editorAsset != null)
+				return editorAsset.name;
+#endif
+
+			var key = assetReference.RuntimeKey;
+			if (key != null)
+			{
+				// Name cached when the prefab was first loaded through this manager
+				if (assetNames.TryGetValue(key, out var cachedName) && !string.IsNullOrEmpty(cachedName))
+					return cachedName;
+
+				// Prefab loaded through this manager, but no name cached yet
+				if (loadedAssets.TryGetValue(key, out var handle)
+					&& handle.IsValid()
+					&& handle.Status == AsyncOperationStatus.Succeeded
+					&& handle.Result != null)
+					return handle.Result.name;
+			}
+
+			// Asset loaded directly through the AssetReference elsewhere
+			if (assetReference.Asset != null)
+				return assetReference.Asset.name;
+
+			return string.IsNullOrEmpty(assetReference.AssetGUID)
+				? "UnknownAsset"
+				: $"Asset[{assetReference.AssetGUID}]";
+		}
+
+		/// <summary>
 		/// Due to memory constraints you can set a maximum pool size, or leave it -1
 		/// </summary>
 		/// <param name="maximumPoolSize"></param>
@@ -168,10 +213,10 @@ namespace MagmaFlow.Framework.Pooling
 			CancelAllPrewarmOperations();
 			CancelAllInstantiateOperation();
 
-			if(!keepPoolsOnSceneChange)
+			if (!keepPoolsOnSceneChange)
 				ClearObjectPools(true);
 
-			if(!keepInstancesAliveOnSceneChange)
+			if (!keepInstancesAliveOnSceneChange)
 				ReleaseAllObjects();
 		}
 
@@ -226,14 +271,20 @@ namespace MagmaFlow.Framework.Pooling
 				// Handle early cancellation before continuing
 				if (cancellationToken.IsCancellationRequested)
 				{
-					MagmaUtils.LogWarning($"Instantiation of {assetReference.editorAsset.name} was cancelled.");
+					MagmaUtils.LogWarning($"Instantiation of {GetAssetName(assetReference)} was cancelled.");
 					return null;
 				}
 
-				if(loadedAsset == null)
+				if (loadedAsset == null)
 				{
-					MagmaUtils.LogWarning($"There was an issue loading {assetReference.editorAsset.name} asset.");
+					MagmaUtils.LogWarning($"There was an issue loading {GetAssetName(assetReference)} asset.");
 					return null;
+				}
+
+				// Cache the prefab name so GetAssetName() returns something readable in builds
+				if (!assetNames.ContainsKey(assetKey))
+				{
+					assetNames[assetKey] = loadedAsset.name;
 				}
 
 				var instance = Instantiate(loadedAsset);
@@ -252,12 +303,8 @@ namespace MagmaFlow.Framework.Pooling
 				//We add a cleanup component that handles removing the entry OnDestroy() from the lookup table
 				instance.AddComponent<PooledInstanceCleanup>().Initialize(this, pooledObject);
 
-				// Register in the appropriate dictionaries
+				// Register in the lookup table
 				lookUp[pooledObject] = assetKey;
-				if (!assetNames.ContainsKey(assetKey))
-				{
-					assetNames[assetKey] = instance.name;
-				}
 
 				return pooledObject;
 			}
@@ -312,9 +359,9 @@ namespace MagmaFlow.Framework.Pooling
 		/// <param name="forAsset">The asset refference used to start the prewarm</param>
 		public void CancelPrewarmOperation(AssetReference forAsset)
 		{
-			if(!prewarmTokens.TryGetValue(forAsset.RuntimeKey, out var cancellationTokenSource))
+			if (!prewarmTokens.TryGetValue(forAsset.RuntimeKey, out var cancellationTokenSource))
 			{
-				MagmaUtils.LogWarning($"No token present for prewarming {forAsset.editorAsset.name}");
+				MagmaUtils.LogWarning($"No token present for prewarming {GetAssetName(forAsset)}");
 				return;
 			}
 
@@ -342,8 +389,7 @@ namespace MagmaFlow.Framework.Pooling
 		public async Task PrewarmPool(AssetReference assetReference, int count)
 		{
 			var key = assetReference.RuntimeKey;
-			if (!currentlyPrewarming.Add(key))
-				return;
+
 			if (!pool.TryGetValue(key, out var currentPool))
 			{
 				currentPool = new Queue<IPoolableObject>();
@@ -351,9 +397,13 @@ namespace MagmaFlow.Framework.Pooling
 			}
 			if (currentPool.Count >= count)
 			{
-				MagmaUtils.Log($"Pre-warm pool {assetReference.editorAsset.name} request ignored, because the pool is already this size or larger!");
+				MagmaUtils.Log($"Pre-warm pool {GetAssetName(assetReference)} request ignored, because the pool is already this size or larger!");
 				return;
 			}
+
+			if (!currentlyPrewarming.Add(key))
+				return;
+
 			int difference = count - currentPool.Count;
 
 			CancellationTokenSource cts = new CancellationTokenSource();
@@ -361,7 +411,7 @@ namespace MagmaFlow.Framework.Pooling
 
 			try
 			{
-				MagmaUtils.Log($"Prewarming {difference} {assetReference.editorAsset.name}...");
+				MagmaUtils.Log($"Prewarming {difference} {GetAssetName(assetReference)}...");
 				for (int i = 0; i < difference; i++)
 				{
 					if (cts.Token.IsCancellationRequested)
@@ -434,7 +484,7 @@ namespace MagmaFlow.Framework.Pooling
 					activeInstantiations.Add(cts);
 					pooledObject = await CreateNewInstance(assetReference, cts.Token);
 				}
-				catch(Exception e)
+				catch (Exception e)
 				{
 
 					MagmaUtils.LogException(e);
@@ -446,7 +496,7 @@ namespace MagmaFlow.Framework.Pooling
 					cts.Dispose();
 				}
 			}
-			
+
 			if (pooledObject == null)
 				return null;
 
@@ -454,11 +504,11 @@ namespace MagmaFlow.Framework.Pooling
 			objTransform.SetParent(parent ?? genericPooledObjectsParent);
 
 			if (!useWorldSpace && parent != null)
-			{	
+			{
 				objTransform.SetLocalPositionAndRotation(position, rotation);
 			}
 			else
-			{	
+			{
 				objTransform.SetPositionAndRotation(position, rotation);
 			}
 
@@ -492,8 +542,8 @@ namespace MagmaFlow.Framework.Pooling
 		/// </summary>
 		public void ReleaseAllObjects()
 		{
-			foreach(var activeInstance in lookUp.Keys)
-			{	
+			foreach (var activeInstance in lookUp.Keys)
+			{
 				ReleaseInstanceInternal(activeInstance);
 			}
 		}
@@ -505,7 +555,7 @@ namespace MagmaFlow.Framework.Pooling
 		/// <param name="pooledObject"></param>
 		public void ReleaseObject(IPoolableObject pooledObject)
 		{
-			if(!lookUp.ContainsKey(pooledObject))
+			if (!lookUp.ContainsKey(pooledObject))
 			{
 				MagmaUtils.LogError($"The object {pooledObject.MonoBehaviour.name}, that you want to release is not pooled.");
 				return;
