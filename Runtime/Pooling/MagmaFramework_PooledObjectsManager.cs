@@ -22,11 +22,13 @@ namespace MagmaFlow.Framework.Pooling
 		/// </summary>
 		public MonoBehaviour MonoBehaviour => this as MonoBehaviour;
 		/// <summary>
-		/// Called after a pooled object is instantiated.
+		/// Called every time the object is taken from the pool, after it's positioned, parented and activated.
+		/// <para>Awake / OnEnable / Start run on the first activation, so they run at the spawn pose too.</para>
 		/// </summary>
 		public void OnInitialize();
 		/// <summary>
-		///	Called when a pooled object is released back into the pool.
+		///	Called when an object that was handed out by InstantiatePooledObject() is released back into the pool.
+		/// <para>Called exactly once per OnInitialize(). Never called for prewarmed objects that were never spawned.</para>
 		/// The object is also set inactive by the pooled manager.
 		/// </summary>
 		public void OnRelease();
@@ -55,10 +57,15 @@ namespace MagmaFlow.Framework.Pooling
 				{
 					assetName = "UnknownEntry";
 				}
-				MagmaUtils.Log($"[POOL] {assetName} -> {count} -- In Pool ||| {activeCount} -- Active");
+				MagmaUtils.Log($"{LOG_PREFIX}{assetName} -> {count} -- In Pool ||| {activeCount} -- Active");
 			}
 		}
 #endif
+
+		/// <summary>
+		/// Prepended to every log from this manager. Same style as MagmaUtils.LogFramework().
+		/// </summary>
+		private const string LOG_PREFIX = "<b><color=#FF5733>[PoolManager]</color></b> ";
 
 		public static MagmaFramework_PooledObjectsManager Instance { get; private set; }
 		[SerializeField][Tooltip("This will be used when initializing the PooledObjectsManager.\nA value of 256 is recommended to avoid bloating up the memory with too many pooled instances.\n-1 for no limit")] private int maximumPoolSize = -1;
@@ -89,7 +96,7 @@ namespace MagmaFlow.Framework.Pooling
 			Instance = this;
 			DontDestroyOnLoad(gameObject);
 
-			MagmaUtils.Log($"\u23E9 {name} service registered.");
+			MagmaUtils.Log($"{LOG_PREFIX}\u23E9 {name} service registered.");
 			return true;
 		}
 
@@ -132,6 +139,14 @@ namespace MagmaFlow.Framework.Pooling
 		/// This is so that our scene inspector doesn't get filled with pooled objects
 		/// </summary>
 		private Transform genericPooledObjectsParent;
+		/// <summary>
+		/// Inactive container that new instances are created under, so their Awake / OnEnable don't run until they're spawned.
+		/// </summary>
+		private Transform inactiveStagingParent;
+		/// <summary>
+		/// Reused by ReleaseAllObjects() so it can safely iterate while the lookup changes.
+		/// </summary>
+		private readonly List<IPoolableObject> releaseBuffer = new();
 		/// <summary>
 		/// A flag that indicates if ClearObjectPools() is in progress
 		/// </summary>
@@ -192,11 +207,17 @@ namespace MagmaFlow.Framework.Pooling
 		/// <param name="maximumPoolSize"></param>
 		private void Initialize(int maximumPoolSize = -1)
 		{
-			MaximumPoolSize = maximumPoolSize >= 0 ? maximumPoolSize : 9999999;
+			MaximumPoolSize = maximumPoolSize >= 0 ? maximumPoolSize : int.MaxValue;
 			var poolRoot = new GameObject("Pooled Objects Container");
 			poolRoot.transform.SetParent(transform);
 			poolRoot.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
 			genericPooledObjectsParent = poolRoot.transform;
+
+			var stagingRoot = new GameObject("Pooled Objects Staging (inactive)");
+			stagingRoot.SetActive(false);
+			stagingRoot.transform.SetParent(transform);
+			inactiveStagingParent = stagingRoot.transform;
+
 			SceneManager.sceneUnloaded += OnSceneUnload;
 		}
 
@@ -226,25 +247,57 @@ namespace MagmaFlow.Framework.Pooling
 		/// <param name="pooledObject"></param>
 		private void ReleaseInstanceInternal(IPoolableObject pooledObject)
 		{
-			if (pooledObject == null) return;
-			var _monoBehaviour = pooledObject.MonoBehaviour;
-			var assetReference = lookUp[pooledObject];
+			// Already in the pool: releasing again would call OnRelease() twice and could destroy a queued instance.
+			if (pooledObject == null || pooledObject.IsAvailable) return;
+
+			if (pooledObject.MonoBehaviour == null)
+			{
+				lookUp.Remove(pooledObject);
+				return;
+			}
 
 			pooledObject.OnRelease();
+			ReturnToPool(pooledObject);
+		}
+
+		/// <summary>
+		/// Deactivates the instance and queues it, or destroys it if the pool is full.
+		/// <para>Does NOT call OnRelease(); used directly for instances that were never handed out (prewarm, aborted spawns).</para>
+		/// </summary>
+		/// <param name="pooledObject"></param>
+		private void ReturnToPool(IPoolableObject pooledObject)
+		{
+			if (!lookUp.TryGetValue(pooledObject, out var assetKey))
+			{
+				MagmaUtils.LogError($"{LOG_PREFIX}The object {pooledObject.MonoBehaviour.name} is not managed by the pool.");
+				return;
+			}
+
+			var _monoBehaviour = pooledObject.MonoBehaviour;
 			_monoBehaviour.gameObject.SetActive(false);
 			_monoBehaviour.transform.SetParent(genericPooledObjectsParent);
-			if (pool[assetReference].Count >= MaximumPoolSize)
+
+			var queue = GetOrCreatePool(assetKey);
+			if (queue.Count >= MaximumPoolSize)
 			{
+				// Removed explicitly, since OnDestroy (and so PooledInstanceCleanup) doesn't run on never-activated objects.
+				lookUp.Remove(pooledObject);
 				Destroy(_monoBehaviour.gameObject);
+				return;
 			}
-			else
+
+			pooledObject.IsAvailable = true;
+			queue.Enqueue(pooledObject);
+		}
+
+		private Queue<IPoolableObject> GetOrCreatePool(object assetKey)
+		{
+			if (!pool.TryGetValue(assetKey, out var queue))
 			{
-				if (!pooledObject.IsAvailable)
-				{
-					pooledObject.IsAvailable = true;
-					pool[assetReference].Enqueue(pooledObject);
-				}
+				queue = new Queue<IPoolableObject>();
+				pool[assetKey] = queue;
 			}
+			return queue;
 		}
 
 		/// <summary>
@@ -257,7 +310,7 @@ namespace MagmaFlow.Framework.Pooling
 		{
 			if (assetReference == null)
 			{
-				MagmaUtils.LogError("CreateNewInstance() called with a NULL asset reference.");
+				MagmaUtils.LogError($"{LOG_PREFIX}CreateNewInstance() called with a NULL asset reference.");
 				return null;
 			}
 
@@ -271,13 +324,13 @@ namespace MagmaFlow.Framework.Pooling
 				// Handle early cancellation before continuing
 				if (cancellationToken.IsCancellationRequested)
 				{
-					MagmaUtils.LogWarning($"Instantiation of {GetAssetName(assetReference)} was cancelled.");
+					MagmaUtils.LogWarning($"{LOG_PREFIX}Instantiation of {GetAssetName(assetReference)} was cancelled.");
 					return null;
 				}
 
 				if (loadedAsset == null)
 				{
-					MagmaUtils.LogWarning($"There was an issue loading {GetAssetName(assetReference)} asset.");
+					MagmaUtils.LogWarning($"{LOG_PREFIX}There was an issue loading {GetAssetName(assetReference)} asset.");
 					return null;
 				}
 
@@ -287,13 +340,14 @@ namespace MagmaFlow.Framework.Pooling
 					assetNames[assetKey] = loadedAsset.name;
 				}
 
-				var instance = Instantiate(loadedAsset);
+				// Created under an inactive parent, so Awake / OnEnable wait until the object is actually spawned
+				var instance = Instantiate(loadedAsset, inactiveStagingParent);
 
 				// Verify it implements IPoolableObject
 				if (!instance.TryGetComponent<IPoolableObject>(out var pooledObject))
 				{
 					MagmaUtils.LogError(
-						$"The prefab '{instance.name}' does not implement IPoolableObject. Cleaning up."
+						$"{LOG_PREFIX}The prefab '{instance.name}' does not implement IPoolableObject. Cleaning up."
 					);
 					Destroy(instance);
 
@@ -326,7 +380,8 @@ namespace MagmaFlow.Framework.Pooling
 			{
 				// We have a handle, so just wait for it to finish if it's not already
 				await handle.Task;
-				return handle.Result; // This is the GameObject prefab
+				// The handle may have been released meanwhile (failed load, or ClearObjectPools)
+				return handle.IsValid() && handle.Status == AsyncOperationStatus.Succeeded ? handle.Result : null;
 			}
 
 			// 2. If not, load it for the first time
@@ -337,7 +392,20 @@ namespace MagmaFlow.Framework.Pooling
 
 			// 4. Await the new handle and return the prefab
 			await loadHandle.Task;
-			return loadHandle.Result;
+
+			// Released by ClearObjectPools() while loading
+			if (!loadHandle.IsValid()) return null;
+
+			if (loadHandle.Status == AsyncOperationStatus.Succeeded) return loadHandle.Result;
+
+			// Don't cache failures, so the next request retries the load
+			MagmaUtils.LogError($"{LOG_PREFIX}Failed to load {GetAssetName(assetReference)}. {loadHandle.OperationException}");
+			if (loadedAssets.TryGetValue(key, out var current) && current.Equals(loadHandle))
+			{
+				loadedAssets.Remove(key);
+			}
+			Addressables.Release(loadHandle);
+			return null;
 		}
 
 		/// <summary>
@@ -361,7 +429,7 @@ namespace MagmaFlow.Framework.Pooling
 		{
 			if (!prewarmTokens.TryGetValue(forAsset.RuntimeKey, out var cancellationTokenSource))
 			{
-				MagmaUtils.LogWarning($"No token present for prewarming {GetAssetName(forAsset)}");
+				MagmaUtils.LogWarning($"{LOG_PREFIX}No token present for prewarming {GetAssetName(forAsset)}");
 				return;
 			}
 
@@ -383,6 +451,8 @@ namespace MagmaFlow.Framework.Pooling
 		/// Pre-warm the pool to a number of instances.
 		/// This does not 'add' or 'remove' items to/from the pool, it simply populates a pool to the desired size.
 		/// <para>Example; calling Prewarm(assetRef, 100) 2 times will not result in having a pool of 200 objects. The second call is redundant.</para>
+		/// <para>Prewarmed instances stay inactive: their Awake / OnEnable, OnInitialize() and OnRelease() don't run until they're spawned.</para>
+		/// <para>The count is capped by MaximumPoolSize.</para>
 		/// </summary>
 		/// <param name="assetReference"></param>
 		/// <param name="count">If this is higher than the current pool count, the pool will increase in size to match the new count. If it is smaller, then nothing happens.</param>
@@ -390,14 +460,11 @@ namespace MagmaFlow.Framework.Pooling
 		{
 			var key = assetReference.RuntimeKey;
 
-			if (!pool.TryGetValue(key, out var currentPool))
-			{
-				currentPool = new Queue<IPoolableObject>();
-				pool[key] = currentPool;
-			}
+			var currentPool = GetOrCreatePool(key);
+			count = Math.Min(count, MaximumPoolSize);
 			if (currentPool.Count >= count)
 			{
-				MagmaUtils.Log($"Pre-warm pool {GetAssetName(assetReference)} request ignored, because the pool is already this size or larger!");
+				MagmaUtils.Log($"{LOG_PREFIX}Pre-warm pool {GetAssetName(assetReference)} request ignored, because the pool is already this size or larger!");
 				return;
 			}
 
@@ -411,7 +478,7 @@ namespace MagmaFlow.Framework.Pooling
 
 			try
 			{
-				MagmaUtils.Log($"Prewarming {difference} {GetAssetName(assetReference)}...");
+				MagmaUtils.Log($"{LOG_PREFIX}Prewarming {difference} {GetAssetName(assetReference)}...");
 				for (int i = 0; i < difference; i++)
 				{
 					if (cts.Token.IsCancellationRequested)
@@ -421,7 +488,8 @@ namespace MagmaFlow.Framework.Pooling
 					if (instance == null)
 						break;
 
-					ReleaseObject(instance);
+					// Never handed out, so it skips OnRelease()
+					ReturnToPool(instance);
 				}
 			}
 			finally
@@ -458,15 +526,11 @@ namespace MagmaFlow.Framework.Pooling
 		{
 			if (assetReference == null)
 			{
-				MagmaUtils.LogError("The asset reference that you want to instantiate is null.");
+				MagmaUtils.LogError($"{LOG_PREFIX}The asset reference that you want to instantiate is null.");
 				return null;
 			}
 
-			if (!pool.TryGetValue(assetReference.RuntimeKey, out var queue))
-			{
-				queue = new Queue<IPoolableObject>();
-				pool[assetReference.RuntimeKey] = queue;
-			}
+			var queue = GetOrCreatePool(assetReference.RuntimeKey);
 
 			IPoolableObject pooledObject = null;
 			if (queue.Count > 0)
@@ -500,8 +564,16 @@ namespace MagmaFlow.Framework.Pooling
 			if (pooledObject == null)
 				return null;
 
+			// A parent was given but destroyed while the asset was loading ('??' would skip Unity's destroyed check)
+			if (parent is not null && parent == null)
+			{
+				MagmaUtils.LogWarning($"{LOG_PREFIX}The parent for {GetAssetName(assetReference)} was destroyed before it could spawn. Returning it to the pool.");
+				ReturnToPool(pooledObject);
+				return null;
+			}
+
 			var objTransform = pooledObject.MonoBehaviour.transform;
-			objTransform.SetParent(parent ?? genericPooledObjectsParent);
+			objTransform.SetParent(parent != null ? parent : genericPooledObjectsParent);
 
 			if (!useWorldSpace && parent != null)
 			{
@@ -542,10 +614,14 @@ namespace MagmaFlow.Framework.Pooling
 		/// </summary>
 		public void ReleaseAllObjects()
 		{
-			foreach (var activeInstance in lookUp.Keys)
+			// Iterate a copy: releasing can remove entries from the lookup (full pool, destroyed instances)
+			releaseBuffer.Clear();
+			releaseBuffer.AddRange(lookUp.Keys);
+			foreach (var instance in releaseBuffer)
 			{
-				ReleaseInstanceInternal(activeInstance);
+				ReleaseInstanceInternal(instance);
 			}
+			releaseBuffer.Clear();
 		}
 
 		/// <summary>
@@ -557,7 +633,13 @@ namespace MagmaFlow.Framework.Pooling
 		{
 			if (!lookUp.ContainsKey(pooledObject))
 			{
-				MagmaUtils.LogError($"The object {pooledObject.MonoBehaviour.name}, that you want to release is not pooled.");
+				MagmaUtils.LogError($"{LOG_PREFIX}The object {pooledObject.MonoBehaviour.name}, that you want to release is not pooled.");
+				return;
+			}
+
+			if (pooledObject.IsAvailable)
+			{
+				MagmaUtils.LogWarning($"{LOG_PREFIX}The object {pooledObject.MonoBehaviour.name} is already in the pool. Ignoring the release.");
 				return;
 			}
 
@@ -567,10 +649,15 @@ namespace MagmaFlow.Framework.Pooling
 		/// <summary>
 		/// Destroys ALL objects managed by this pool (both active and inactive).
 		/// Can release all loaded Addressable assets.
+		/// <para>Also cancels pending prewarm / instantiate operations; their awaiting callers get null.</para>
 		/// </summary>
 		/// <param name="releaseAllLoadedAssets">If TRUE: Releases all loaded Addressable assets</param>
 		public void ClearObjectPools(bool releaseAllLoadedAssets = false)
 		{
+			// Otherwise an in-flight load would register an instance after its pool is gone
+			CancelAllPrewarmOperations();
+			CancelAllInstantiateOperation();
+
 			isClearing = true;
 
 			// Destroy all INACTIVE objects (in the queues)

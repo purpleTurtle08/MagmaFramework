@@ -10,7 +10,7 @@ namespace MagmaFlow.Framework.Core
 	/// Use the inspector to populate AssetReferences; the inspector will derive and persist the keys (names)
 	/// so the dictionary can be reconstructed at runtime in builds.
 	/// </summary>
-	[CreateAssetMenu(fileName = "AssetReferenceDictionaryBuilder", menuName = "Scriptable Objects/MagmaFramework/Asset Reference Dictionary Builder")]
+	[CreateAssetMenu(fileName = "AssetReferenceDictionaryBuilder", menuName = "MagmaFramework/Asset Reference Dictionary Builder")]
 	public class AssetReferenceDictionaryBuilder : ScriptableObject
 	{
 		[SerializeField, Tooltip("Drag & drop all the AssetReference entries you want in this dictionary.")]

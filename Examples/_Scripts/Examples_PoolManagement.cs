@@ -6,7 +6,6 @@ using UnityEngine.InputSystem;
 
 namespace MagmaFlow.Framework.Examples
 {
-
 	public class Examples_PoolManagement : BaseBehaviour
 	{
 		[SerializeField] private Transform instantiatedAsset1_Parent;
@@ -116,7 +115,7 @@ namespace MagmaFlow.Framework.Examples
 		private void PrewarmAsset1()
 		{
 			//Example of discaded pre-warm call, pre-warming 5000 prefabs
-			_ = MagmaFramework_PooledObjectsManager.PrewarmPool(assets.GetAssetReference("Cube"), 5000);
+			_ = MagmaFramework_PooledObjectsManager.PrewarmPool(assets.GetAssetReference("Cube"), 25);
 		}
 		/// <summary>
 		/// Press key 2 to pre-warm this prefab
@@ -124,7 +123,7 @@ namespace MagmaFlow.Framework.Examples
 		private async void PrewarmAsset2()
 		{
 			//Example of awaited pre-warm call, pre-warming 5000 prefabs
-			await MagmaFramework_PooledObjectsManager.PrewarmPool(assets.GetAssetReference("Sphere"), 5000);
+			await MagmaFramework_PooledObjectsManager.PrewarmPool(assets.GetAssetReference("Sphere"), 25);
 		}
 		/// <summary>
 		/// Example of integrating a pre-warm pool call inside an IEnumerator
@@ -133,9 +132,9 @@ namespace MagmaFlow.Framework.Examples
 		private IEnumerator PrewarmAllAssetsRoutine()
 		{
 			yield return new WaitForSeconds(1);
-			yield return MagmaFramework_PooledObjectsManager.PrewarmPool(assets.GetAssetReference("Cube"), 1000);
+			yield return MagmaFramework_PooledObjectsManager.PrewarmPool(assets.GetAssetReference("Cube"), 5);
 			yield return new WaitForSeconds(1);
-			yield return MagmaFramework_PooledObjectsManager.PrewarmPool(assets.GetAssetReference("Sphere"), 1000);
+			yield return MagmaFramework_PooledObjectsManager.PrewarmPool(assets.GetAssetReference("Sphere"), 5);
 			yield return new WaitForEndOfFrame();
 		}
 		/// <summary>

@@ -1,5 +1,6 @@
 using MagmaFlow.Framework.Core;
 using MagmaFlow.Framework.Pooling;
+using MagmaFlow.Framework.Utils;
 using UnityEngine;
 
 namespace MagmaFlow.Framework.Examples
@@ -29,8 +30,12 @@ namespace MagmaFlow.Framework.Examples
 		{
 			//We set the lifetime of the object to the inspector value
 			lifetimeLeft = lifeSpan;
+			MagmaUtils.Log($"[Pooled instance] {gameObject.name} initialized.");
 		}
 
-		public void OnRelease() { }
+		public void OnRelease() 
+		{
+			MagmaUtils.Log($"[Pooled instance] {gameObject.name} released.");
+		}
 	}
 }
