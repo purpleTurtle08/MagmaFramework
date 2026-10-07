@@ -17,93 +17,9 @@ namespace MagmaFlow.Framework.Core
 	/// </summary>
 	public class BaseBehaviour : MonoBehaviour
 	{
-		// Shared by all BaseBehaviours. Safe because Physics queries are main-thread only and these methods don't re-enter.
-		// Created on first use, so a BaseBehaviour that never calls GetOverlapContactPoints() costs nothing.
-		private static Collider[] s_overlapBuffer;
-		private static RaycastHit[] s_lineOfSightHits;
-
 		protected MagmaFramework_Core MagmaFramework_Core => MagmaFramework_Core.Instance;
 		protected MagmaFramework_PooledObjectsManager MagmaFramework_PooledObjectsManager => MagmaFramework_PooledObjectsManager.Instance;
 		protected MagmaFramework_MusicManager MagmaFramework_MusicManager => MagmaFramework_MusicManager.Instance;
-
-		private Collider[] _overlapResult;
-
-		#region Get overlap points
-
-		/// <summary>
-		/// Finds the closest points (to the sourcePoint) on all colliders that are within the overlap sphere of this sourcePoint.
-		/// <para>Colliders on this object and its children are always ignored.</para>
-		/// </summary>
-		/// <param name="results">Points are appended to this list.</param>
-		/// <param name="sourcePoint">The center of the overlap sphere.</param>
-		/// <param name="radius">The radius of the overlap sphere.</param>
-		/// <param name="numberOfPoints">Maximum number of colliders to check.</param>
-		/// <param name="collisionLayerMask">The layers to check against.</param>
-		/// <param name="ignoreTriggers">How to handle trigger colliders.</param>
-		/// <param name="passThrough">If false, points hidden behind other colliders are discarded.</param>
-		protected void GetOverlapContactPoints
-		(
-			ref List<Vector3> results,
-			Vector3 sourcePoint,
-			float radius,
-			int numberOfPoints = 4,
-			LayerMask? collisionLayerMask = null,
-			QueryTriggerInteraction ignoreTriggers = QueryTriggerInteraction.Ignore,
-			bool passThrough = true
-		)
-		{
-			// Grows only when a caller asks for more than any previous one, never per call
-			if (s_overlapBuffer == null || s_overlapBuffer.Length < numberOfPoints) s_overlapBuffer = new Collider[numberOfPoints];
-
-			int actualMask = collisionLayerMask ?? Physics.AllLayers;
-			int noOfOverlappingColliders = Physics.OverlapSphereNonAlloc(sourcePoint, radius, s_overlapBuffer, actualMask, ignoreTriggers);
-
-			if (noOfOverlappingColliders >= _overlapResult.Length)
-			{
-				MagmaUtils.LogWarning($"{gameObject.name} ::: Found {noOfOverlappingColliders} overlapping colliders, " +
-								 $"which fills the buffer of {_overlapResult.Length}. Some colliders may have been missed. " +
-								 $"Increase numberOfPoints OR decrease the radius when calling GetOverlapContactPoints().");
-			}
-
-			if (results == null) results = new List<Vector3>(numberOfPoints);
-			for (int i = 0; i < noOfOverlappingColliders; i++)
-			{
-				Collider target = _overlapResult[i];
-				if (IsOwnCollider(target)) continue;
-
-				Vector3 pointToAdd = target.ClosestPoint(sourcePoint);
-				if (sourcePoint == pointToAdd) continue;
-
-				if (passThrough || HasLineOfSight(pointToAdd, sourcePoint, target, actualMask, ignoreTriggers))
-				{
-					results.Add(pointToAdd);
-				}
-			}
-		}
-
-		/// <summary>
-		/// True if nothing except this object's own colliders and the target itself lies between the two points.
-		/// </summary>
-		private bool HasLineOfSight(Vector3 from, Vector3 to, Collider target, int mask, QueryTriggerInteraction triggers)
-		{
-			Vector3 delta = to - from;
-			float distance = delta.magnitude;
-			if (distance <= Mathf.Epsilon) return true;
-
-			s_lineOfSightHits ??= new RaycastHit[16];
-			int hits = Physics.RaycastNonAlloc(from, delta / distance, s_lineOfSightHits, distance, mask, triggers);
-			for (int h = 0; h < hits; h++)
-			{
-				Collider hit = s_lineOfSightHits[h].collider;
-				if (hit == target || IsOwnCollider(hit)) continue;
-				return false; // Something else is in the way.
-			}
-			return true;
-		}
-
-		private bool IsOwnCollider(Collider c) => c.transform.IsChildOf(transform);
-
-		#endregion Get overlap points
 
 		#region Events
 
@@ -174,12 +90,15 @@ namespace MagmaFlow.Framework.Core
 		}
 
 		/// <summary>
-		/// Invokes an action after with a delay.
-		/// It uses scaled time and callback won't fire if the object dies.
+		/// Invokes an action after a delay, in scaled time.
+		/// <para>The callback is cancelled if the object is destroyed OR deactivated (coroutines stop on SetActive(false)).
+		/// For pooled objects this means releasing them cancels any pending call.</para>
+		/// <para>With delay &lt;= 0 the action runs immediately (in this call, not next frame) and null is returned.</para>
+		/// <para>Allocates a coroutine, a WaitForSeconds and (for lambdas / method groups) a delegate per call. Avoid it in per-frame code.</para>
 		/// </summary>
 		/// <param name="action"></param>
-		/// <param name="delay"></param>
-		/// <returns>Returns the coroutine that handles the invoking.</returns>
+		/// <param name="delay">Seconds, in scaled time (paused when Time.timeScale is 0).</param>
+		/// <returns>Returns the coroutine that handles the invoking (can be stopped with StopCoroutine), or null if it ran immediately.</returns>
 		protected Coroutine InvokeDelayed(Action action, float delay = 0)
 		{	
 			if(delay <= 0)
@@ -220,13 +139,9 @@ namespace MagmaFlow.Framework.Core
 
 
 		/// <summary>
-		/// Instantiates an object using an asset refference.
+		/// Asynchronously instantiates an Addressable at the origin (or at the parent's origin when useWorldSpace is false).
+		/// <para>See the overload with position / rotation for details.</para>
 		/// </summary>
-		/// <typeparam name="T"></typeparam>
-		/// <param name="assetReference"></param>
-		/// <param name="parent"></param>
-		/// <param name="useWorldSpace"></param>
-		/// <returns></returns>
 		protected async Task<T> InstantiateAddressable<T>
 		(
 			AssetReference assetReference,
@@ -238,7 +153,8 @@ namespace MagmaFlow.Framework.Core
 		}
 
 		/// <summary>
-		/// Synchronously instantiates an object using an asset reference at the origin.
+		/// Synchronously instantiates an Addressable at the origin (or at the parent's origin when useWorldSpace is false).
+		/// <para>See the overload with position / rotation for details.</para>
 		/// </summary>
 		protected T InstantiateAddressableSync<T>
 		(
@@ -250,6 +166,16 @@ namespace MagmaFlow.Framework.Core
 			return InstantiateAddressableSync<T>(assetReference, Vector3.zero, Quaternion.identity, parent, useWorldSpace);
 		}
 
+		/// <summary>
+		/// Asynchronously instantiates an Addressable, optionally under a parent.
+		/// <para>The instance is released from Addressables automatically when it's destroyed.</para>
+		/// <para>Returns null (and releases the instance) if loading fails, if the prefab has no T, or if this object was destroyed while loading.</para>
+		/// </summary>
+		/// <typeparam name="T">GameObject, or a component on the prefab's root.</typeparam>
+		/// <param name="position">World position, or local to the parent when useWorldSpace is false.</param>
+		/// <param name="rotation">World rotation, or local to the parent when useWorldSpace is false.</param>
+		/// <param name="parent">Optional parent.</param>
+		/// <param name="useWorldSpace">False: position / rotation are relative to the parent, and stay correct even if the parent moves while loading.</param>
 		protected async Task<T> InstantiateAddressable<T>
 		(
 			AssetReference assetReference,
@@ -267,9 +193,19 @@ namespace MagmaFlow.Framework.Core
 
 			try
 			{
-				ToWorldPose(ref position, ref rotation, parent, useWorldSpace);
-				var handle = Addressables.InstantiateAsync(assetReference, position, rotation, parent);
+				Vector3 worldPosition = position;
+				Quaternion worldRotation = rotation;
+				ToWorldPose(ref worldPosition, ref worldRotation, parent, useWorldSpace);
+				var handle = Addressables.InstantiateAsync(assetReference, worldPosition, worldRotation, parent);
 				await handle.Task;
+
+				// The world pose above was computed when the request was made; if the parent moved while loading,
+				// re-apply the requested local pose so the instance ends up where it was asked to be, relative to the parent.
+				if (!useWorldSpace && parent != null && handle.Status == AsyncOperationStatus.Succeeded && handle.Result != null)
+				{
+					handle.Result.transform.SetLocalPositionAndRotation(position, rotation);
+				}
+
 				return FinalizeInstance<T>(handle, assetReference);
 			}
 			catch (Exception e)
@@ -279,6 +215,17 @@ namespace MagmaFlow.Framework.Core
 			}
 		}
 
+		/// <summary>
+		/// Synchronously instantiates an Addressable, optionally under a parent. Blocks until the asset is loaded.
+		/// <para>NOT supported on WebGL (relies on WaitForCompletion()); use InstantiateAddressable() there.</para>
+		/// <para>Blocking on an asset that isn't loaded yet (especially a remote one) can freeze the frame; prefer it for already loaded or local assets.</para>
+		/// <para>Same release / null-return rules as InstantiateAddressable().</para>
+		/// </summary>
+		/// <typeparam name="T">GameObject, or a component on the prefab's root.</typeparam>
+		/// <param name="position">World position, or local to the parent when useWorldSpace is false.</param>
+		/// <param name="rotation">World rotation, or local to the parent when useWorldSpace is false.</param>
+		/// <param name="parent">Optional parent.</param>
+		/// <param name="useWorldSpace">False: position / rotation are relative to the parent.</param>
 		protected T InstantiateAddressableSync<T>
 		(
 			AssetReference assetReference,
@@ -312,14 +259,16 @@ namespace MagmaFlow.Framework.Core
 
 		/// <summary>
 		/// Shared post-instantiation step for InstantiateAddressable / InstantiateAddressableSync.
-		/// Validates the operation, attaches the release-on-destroy component and resolves the requested type.
+		/// Validates the operation, resolves the requested type and attaches the release-on-destroy component.
 		/// <para>On any failure the instance (if one was created) is released and null is returned.</para>
 		/// </summary>
 		private T FinalizeInstance<T>(AsyncOperationHandle<GameObject> handle, AssetReference assetReference) where T : UnityEngine.Object
 		{
 			if (handle.Status != AsyncOperationStatus.Succeeded || handle.Result == null)
 			{
-				MagmaUtils.LogError($"{name} ::: Failed to instantiate Addressable '{assetReference.AssetGUID}'. {handle.OperationException}");
+				// 'this' may have been destroyed while loading, and reading 'name' on it would throw
+				string caller = this != null ? name : "<destroyed caller>";
+				MagmaUtils.LogError($"{caller} ::: Failed to instantiate Addressable '{assetReference.AssetGUID}'. {handle.OperationException}");
 				if (handle.IsValid()) Addressables.Release(handle);
 				return null;
 			}
@@ -332,23 +281,30 @@ namespace MagmaFlow.Framework.Core
 			}
 
 			GameObject instance = handle.Result;
-
-			// Must be added before any Destroy() below, so destroying the instance also releases it.
-			instance.AddComponent<InstantiatedAddressableCleanup>();
+			T result = null;
 
 			if (typeof(T) == typeof(GameObject))
 			{
-				return instance as T;
+				result = instance as T;
 			}
-
-			if (typeof(Component).IsAssignableFrom(typeof(T)) && instance.TryGetComponent(typeof(T), out var component))
+			else if (typeof(Component).IsAssignableFrom(typeof(T)) && instance.TryGetComponent(typeof(T), out var component))
 			{
-				return component as T;
+				result = component as T;
 			}
 
-			MagmaUtils.LogError($"{name} ::: Prefab '{instance.name}' does not contain a {typeof(T).Name}. Destroying the instance.");
-			Destroy(instance);
-			return null;
+			if (result == null)
+			{
+				// Released through the handle rather than Destroy(): OnDestroy (and so the cleanup component)
+				// never runs on a prefab whose root is saved inactive, which would leak the Addressables reference.
+				MagmaUtils.LogError($"{name} ::: Prefab '{instance.name}' does not contain a {typeof(T).Name}. Releasing the instance.");
+				Addressables.ReleaseInstance(handle);
+				return null;
+			}
+
+			// Releases the instance when it's destroyed.
+			// Note: like any OnDestroy, it only runs if the instance was active at some point.
+			instance.AddComponent<InstantiatedAddressableCleanup>();
+			return result;
 		}
 
 		/// <summary>

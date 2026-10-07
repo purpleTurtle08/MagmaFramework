@@ -1,6 +1,7 @@
 using MagmaFlow.Framework.Core;
 using MagmaFlow.Framework.Events;
 using MagmaFlow.Framework.Pooling;
+using MagmaFlow.Framework.Utils;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -48,20 +49,21 @@ namespace MagmaFlow.Framework.Examples
 		/// <summary>
 		/// This method exemplifies the use of GetOverlapContactPoints(), as well as instantiating a pooled object or an addressable
 		/// </summary>
-		private async void DisplayOverlapContactPoints()
+		private void DisplayOverlapContactPoints()
 		{
+			//GetOverlapContactPoints() appends to the list, so clear it first (the list itself is reused, no allocation per frame)
+			overlappingCollidersRef?.Clear();
 			//We get the list of points on the colliders in range
-			GetOverlapContactPoints(ref overlappingCollidersRef, transform.position, Range, 15, passThrough: PassThrough);
+			MagmaUtils.GetOverlapContactPoints(ref overlappingCollidersRef, transform.position, Range, transform, 15, passThrough: PassThrough);
 			//We instantiate a prefab at each of those points, for a visual feedback
 			foreach (var contactPoint in overlappingCollidersRef)
 			{
-				//awaited pooled object instantiation
-				await MagmaFramework_PooledObjectsManager.InstantiatePooledObject<Examples_PooledObjectImplementation>(assets.GetAssetReference("ContactPoint"), contactPoint, Quaternion.identity);
-				// If you don't need to await the instantiation, use the discard operator
-				// _ = MagmaFramework_PooledObjectsManager.InstantiatePooledObject<Exampled_PooledObject>(assets.GetAssetReference("ContactPoint"), contactPoint, Quaternion.identity);
+				//We don't await here, so the discard operator is used.
+				//Awaiting inside this loop would resume on a later frame, after Update() has already cleared / refilled the list,
+				//which throws "Collection was modified". If you need to await, loop over a copy of the list instead.
+				_ = MagmaFramework_PooledObjectsManager.InstantiatePooledObject<Examples_PooledObjectImplementation>(assets.GetAssetReference("ContactPoint"), contactPoint, Quaternion.identity);
 				// If you want to instantiate an addressable (not pooled)
-				// await InstantiateAddressable<Exampled_PooledObject>(assets.GetAssetReference("ContactPoint"), contactPoint, Quaternion.identity);
-
+				// _ = InstantiateAddressable<Examples_PooledObjectImplementation>(assets.GetAssetReference("ContactPoint"), contactPoint, Quaternion.identity);
 			}
 		}
 		private void GreetingOnStart()

@@ -30,12 +30,12 @@ namespace MagmaFlow.Framework.Examples
 		{
 			//We set the lifetime of the object to the inspector value
 			lifetimeLeft = lifeSpan;
-			MagmaUtils.Log($"[Pooled instance] {gameObject.name} initialized.");
+			//MagmaUtils.Log($"[Pooled instance] {gameObject.name} initialized.");
 		}
 
 		public void OnRelease() 
 		{
-			MagmaUtils.Log($"[Pooled instance] {gameObject.name} released.");
+			//MagmaUtils.Log($"[Pooled instance] {gameObject.name} released.");
 		}
 	}
 }
